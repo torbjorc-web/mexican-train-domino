@@ -65,13 +65,14 @@ export function renderBoard(scene) {
     if (scene.state.pendingDouble && scene.state.pendingDouble.trainIndex === trainIndex) {
       labelLines.push('cover required');
     }
-    const labelX = anchor.align === 'left' ? anchor.x - 85 : (anchor.align === 'right' ? anchor.x + 85 : anchor.x);
-    const label = scene.add.text(labelX, anchor.y - 10, labelLines.join('\n'), {
+    const labelX = anchor.align === 'left' ? anchor.x - 92 : (anchor.align === 'right' ? anchor.x + 92 : anchor.x);
+    const labelY = train.isMexican ? anchor.y + 42 : anchor.y - 16;
+    const label = scene.add.text(labelX, labelY, labelLines.join('\n'), {
       fontFamily: 'Georgia',
-      fontSize: '14px',
+      fontSize: '15px',
       color: UI_COLORS.ink,
       align: anchor.align === 'left' ? 'right' : (anchor.align === 'right' ? 'left' : 'center'),
-    }).setOrigin(anchor.align === 'left' ? 1 : (anchor.align === 'right' ? 0 : 0.5), 0.5);
+    }).setOrigin(anchor.align === 'left' ? 1 : (anchor.align === 'right' ? 0 : 0.5), train.isMexican ? 0 : 0.5);
 
     scene.ui.boardGroup.addMultiple([rail, endpoint, zone, label]);
 

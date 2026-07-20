@@ -21,43 +21,43 @@ function resolveTrainColorKey(scene, train, index) {
 function createTrainStationCard(scene, train, index) {
   const trainColor = getTrainColorStyle(resolveTrainColorKey(scene, train, index));
   const card = scene.add.container(0, 0);
-  const body = scene.add.rectangle(0, 0, 176, 76, trainColor.fill)
+  const body = scene.add.rectangle(0, 0, 198, 56, trainColor.fill)
     .setStrokeStyle(2, trainColor.stroke, 1)
     .setOrigin(0.5, 0.5);
-  const innerPanel = scene.add.rectangle(0, 2, 132, 44, UI_COLORS.playable)
+  const innerPanel = scene.add.rectangle(18, 0, 142, 32, UI_COLORS.playable)
     .setStrokeStyle(2, trainColor.stroke, 1)
     .setOrigin(0.5, 0.5);
-  const accentBar = scene.add.rectangle(-74, 0, 12, 56, trainColor.stroke)
+  const accentBar = scene.add.rectangle(-86, 0, 12, 42, trainColor.stroke)
     .setStrokeStyle(1, trainColor.stroke, 1)
     .setOrigin(0.5, 0.5);
-  const locomotive = scene.add.rectangle(-16, -14, 70, 20, trainColor.fill)
+  const locomotive = scene.add.rectangle(-18, -10, 66, 16, trainColor.fill)
     .setStrokeStyle(2, trainColor.stroke, 1)
     .setOrigin(0.5, 0.5);
-  const cab = scene.add.rectangle(32, -24, 24, 20, trainColor.fill)
+  const cab = scene.add.rectangle(28, -20, 20, 16, trainColor.fill)
     .setStrokeStyle(2, trainColor.stroke, 1)
     .setOrigin(0.5, 0.5);
-  const wheelLeft = scene.add.circle(-34, 31, 6, trainColor.stroke).setOrigin(0.5, 0.5);
-  const wheelRight = scene.add.circle(6, 31, 6, trainColor.stroke).setOrigin(0.5, 0.5);
-  const smokeStack = scene.add.rectangle(48, -32, 10, 16, trainColor.stroke)
+  const wheelLeft = scene.add.circle(-36, 23, 5, trainColor.stroke).setOrigin(0.5, 0.5);
+  const wheelRight = scene.add.circle(4, 23, 5, trainColor.stroke).setOrigin(0.5, 0.5);
+  const smokeStack = scene.add.rectangle(42, -26, 8, 12, trainColor.stroke)
     .setStrokeStyle(1, trainColor.stroke, 1)
     .setOrigin(0.5, 0.5);
   const labelText = train.isMexican
     ? 'Mexican'
     : (scene.state.players[train.ownerIndex]?.name || `P${index + 1}`);
-  const label = scene.add.text(12, 18, labelText, {
+  const label = scene.add.text(34, 14, labelText, {
     fontFamily: 'Georgia',
-    fontSize: '14px',
+    fontSize: '13px',
     color: '#ffffff',
     fontStyle: 'bold',
   }).setOrigin(0.5, 0.5);
-  const colorLabel = scene.add.text(12, -10, trainColor.label, {
-    fontFamily: 'Georgia',
-    fontSize: '11px',
-    color: '#ffffff',
-  }).setOrigin(0.5, 0.5);
-  const statusLabel = scene.add.text(12, 40, train.isMexican ? 'Public line' : (train.open ? 'Open train' : 'Closed train'), {
+  const colorLabel = scene.add.text(34, -8, trainColor.label, {
     fontFamily: 'Georgia',
     fontSize: '10px',
+    color: '#ffffff',
+  }).setOrigin(0.5, 0.5);
+  const statusLabel = scene.add.text(34, 28, train.isMexican ? 'Public line' : (train.open ? 'Open train' : 'Closed train'), {
+    fontFamily: 'Georgia',
+    fontSize: '9px',
     color: '#ffffff',
   }).setOrigin(0.5, 0.5);
   card.add([body, innerPanel, accentBar, locomotive, cab, smokeStack, wheelLeft, wheelRight, label, colorLabel, statusLabel]);
@@ -66,16 +66,16 @@ function createTrainStationCard(scene, train, index) {
 
 export function renderTrainStation(scene) {
   scene.ui.trainStationGroup.clear(true, true);
-  const stationX = 1050;
-  const stationY = 360;
-  const stationPanel = scene.add.rectangle(stationX, stationY, 410, 392, UI_COLORS.panel).setStrokeStyle(2, UI_COLORS.boardLine, 0.55);
-  const stationTitle = scene.add.text(stationX, stationY - 166, 'Train Station', {
+  const stationX = 1150;
+  const stationY = 330;
+  const stationPanel = scene.add.rectangle(stationX, stationY, 250, 530, UI_COLORS.panel).setStrokeStyle(2, UI_COLORS.boardLine, 0.55);
+  const stationTitle = scene.add.text(stationX, stationY - 242, 'Train Station', {
     fontFamily: 'Georgia',
     fontSize: '20px',
     color: UI_COLORS.ink,
     fontStyle: 'bold',
   }).setOrigin(0.5, 0.5);
-  const stationHint = scene.add.text(stationX, stationY - 140, 'Each train keeps a unique color.', {
+  const stationHint = scene.add.text(stationX, stationY - 214, 'Each train keeps a unique color.', {
     fontFamily: 'Georgia',
     fontSize: '13px',
     color: UI_COLORS.ink,
@@ -83,17 +83,12 @@ export function renderTrainStation(scene) {
   }).setOrigin(0.5, 0.5);
 
   const cards = scene.state.trains.map((train, index) => ({ train, index }));
-  const columns = 2;
-  const cardSpacingX = 188;
-  const cardSpacingY = 122;
-  const startX = stationX - ((columns - 1) * cardSpacingX) / 2;
-  const startY = stationY - 82 - ((Math.ceil(cards.length / columns) - 1) * cardSpacingY) / 2;
+  const cardSpacingY = 78;
+  const startY = stationY - 152 - ((cards.length - 1) * cardSpacingY) / 2;
 
   cards.forEach(({ train, index }, cardIndex) => {
-    const column = cardIndex % columns;
-    const row = Math.floor(cardIndex / columns);
     const card = createTrainStationCard(scene, train, index);
-    card.setPosition(startX + (column * cardSpacingX), startY + (row * cardSpacingY));
+    card.setPosition(stationX, startY + (cardIndex * cardSpacingY));
     scene.ui.trainStationGroup.add(card);
   });
 
