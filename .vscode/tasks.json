@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Mexican Train Server",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m",
+        "http.server",
+        "8000"
+      ],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Open Mexican Train Game",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Start-Process 'http://127.0.0.1:8000/'"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Open Mexican Train Tests",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Start-Process 'http://127.0.0.1:8000/tests/run-tests.html'"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Mexican Train + Tests",
+      "dependsOn": [
+        "Run Mexican Train Server",
+        "Open Mexican Train Game",
+        "Open Mexican Train Tests"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    }
+  ]
+}

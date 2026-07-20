@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Mexican Train Game",
+      "type": "pwa-msedge",
+      "request": "launch",
+      "url": "http://127.0.0.1:8000/",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "Run Mexican Train Server"
+    },
+    {
+      "name": "Launch Mexican Train Tests",
+      "type": "pwa-msedge",
+      "request": "launch",
+      "url": "http://127.0.0.1:8000/tests/run-tests.html",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "Run Mexican Train Server"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Launch Game And Tests",
+      "configurations": [
+        "Launch Mexican Train Game",
+        "Launch Mexican Train Tests"
+      ],
+      "preLaunchTask": "Run Mexican Train Server"
+    }
+  ]
+}
