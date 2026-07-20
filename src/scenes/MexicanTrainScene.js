@@ -3,26 +3,37 @@ import {
   DIFFICULTY_SETTINGS,
   DOUBLE_RULE_SETTINGS,
   MAX_PLAYERS,
-  MAX_PIP,
   MIN_PLAYERS,
-  TOTAL_ROUNDS,
   UI_COLORS,
 } from '../config/gameConfig.js';
-import { createDominoSprite } from '../render/createDominoSprite.js';
 import {
   clamp,
-  cloneTile,
-  createDominoSet,
-  getHandSize,
-  getTrainAnchors,
   isDouble,
-  makeTrain,
-  pipSum,
-  playableValueForTile,
-  shuffle,
-  summarizeHand,
-  tileLabel,
 } from '../utils/dominoes.js';
+import {
+  canAnyPlayerMove,
+  canPlayOnTrain,
+  chooseBotMove,
+  createMatchState,
+  createRoundState,
+  drawForCurrentPlayer,
+  finalizeScores,
+  getAllLegalMoves,
+  getMatchLeaderIndex,
+  getMexicanTrainIndex,
+  getPlayableTargets,
+  getPlayableTiles,
+  handleUnableToPlay,
+  normalizeSettings,
+  playTile,
+} from '../state/gameState.js';
+import {
+  renderBoard,
+  renderHand,
+  renderPlayerSummary,
+  renderScoreboard,
+  renderStatus,
+} from '../render/gameSceneRenderers.js';
 
 export class MexicanTrainScene extends Phaser.Scene {
   constructor() {
@@ -36,18 +47,7 @@ export class MexicanTrainScene extends Phaser.Scene {
   }
 
   init(data) {
-    this.settings = {
-      ...DEFAULT_SETTINGS,
-      ...(data?.settings || {}),
-    };
-    this.settings.totalPlayers = clamp(this.settings.totalPlayers, MIN_PLAYERS, MAX_PLAYERS);
-    this.settings.humanPlayers = clamp(this.settings.humanPlayers, 1, this.settings.totalPlayers);
-    if (!DIFFICULTY_SETTINGS[this.settings.difficulty]) {
-      this.settings.difficulty = DEFAULT_SETTINGS.difficulty;
-    }
-    if (!DOUBLE_RULE_SETTINGS[this.settings.doubleRule]) {
-      this.settings.doubleRule = DEFAULT_SETTINGS.doubleRule;
-    }
+    this.settings = normalizeSettings({ ...DEFAULT_SETTINGS, ...(data?.settings || {}) });
   }
 
   create() {
@@ -252,60 +252,12 @@ export class MexicanTrainScene extends Phaser.Scene {
   }
 
   startMatch() {
-    this.match = {
-      roundIndex: 0,
-      scores: Array(this.settings.totalPlayers).fill(0),
-      roundsWon: Array(this.settings.totalPlayers).fill(0),
-      completed: false,
-      history: [],
-    };
+    this.match = createMatchState(this.settings);
     this.startRound();
   }
 
   startRound() {
-    const engineValue = MAX_PIP - this.match.roundIndex;
-    const totalPlayers = this.settings.totalPlayers;
-    const handSize = getHandSize(totalPlayers);
-    const deck = shuffle(createDominoSet().filter((tile) => !(tile.a === engineValue && tile.b === engineValue)));
-    const players = Array.from({ length: totalPlayers }, (_, index) => ({
-      name: index < this.settings.humanPlayers ? `Player ${index + 1}` : `Bot ${index - this.settings.humanPlayers + 1}`,
-      hand: [],
-      isHuman: index < this.settings.humanPlayers,
-      hasStartedTrain: false,
-    }));
-
-    for (let handIndex = 0; handIndex < handSize; handIndex += 1) {
-      for (let playerIndex = 0; playerIndex < totalPlayers; playerIndex += 1) {
-        players[playerIndex].hand.push(deck.pop());
-      }
-    }
-
-    const trains = players.map((player, index) => makeTrain(`${player.name} Train`, index, false, engineValue));
-    trains.push(makeTrain('Mexican Train', null, true, engineValue));
-
-    this.state = {
-      engineValue,
-      players,
-      trains,
-      boneyard: deck,
-      currentPlayer: this.match.roundIndex % totalPlayers,
-      pendingDouble: null,
-      extraTurnPending: false,
-      roundOver: false,
-      roundBlocked: false,
-      winner: null,
-      mustDrawBeforePass: false,
-      lastRoundScores: null,
-      openingPhase: this.settings.strictOpening,
-      humanRevealPending: false,
-      turnMessage: '',
-      log: [
-        `Round ${this.match.roundIndex + 1} starts with engine ${engineValue}|${engineValue}.`,
-        this.settings.strictOpening
-          ? 'Opening phase: each player must establish their own train before wider play unlocks.'
-          : 'Free opening: players may use any eligible trains immediately.',
-      ],
-    };
+    this.state = createRoundState(this.match, this.settings);
 
     this.selectedTileId = null;
     this.draggingTileId = null;
@@ -332,7 +284,7 @@ export class MexicanTrainScene extends Phaser.Scene {
   }
 
   getMexicanTrainIndex() {
-    return this.state.players.length;
+    return getMexicanTrainIndex(this.state);
   }
 
   getRequiredTrainIndex() {
@@ -345,42 +297,19 @@ export class MexicanTrainScene extends Phaser.Scene {
   }
 
   canPlayOnTrain(playerIndex, trainIndex, tile) {
-    const train = this.state.trains[trainIndex];
-    const requiredTrainIndex = this.getRequiredTrainIndex();
-
-    if (!tile) {
-      return false;
-    }
-    if (requiredTrainIndex !== null) {
-      return requiredTrainIndex === trainIndex && playableValueForTile(tile, train.endpoint) !== null;
-    }
-    if (this.state.openingPhase && trainIndex !== playerIndex) {
-      return false;
-    }
-    if (!train.isMexican && train.ownerIndex !== playerIndex && !train.open) {
-      return false;
-    }
-    return playableValueForTile(tile, train.endpoint) !== null;
+    return canPlayOnTrain(this.state, playerIndex, trainIndex, tile);
   }
 
   getPlayableTargets(playerIndex, tile) {
-    return this.state.trains
-      .map((train, trainIndex) => ({ train, trainIndex }))
-      .filter(({ trainIndex }) => this.canPlayOnTrain(playerIndex, trainIndex, tile));
+    return getPlayableTargets(this.state, playerIndex, tile);
   }
 
   getPlayableTiles(playerIndex) {
-    return this.state.players[playerIndex].hand.filter((tile) => this.getPlayableTargets(playerIndex, tile).length > 0);
+    return getPlayableTiles(this.state, playerIndex);
   }
 
   getAllLegalMoves(playerIndex) {
-    const moves = [];
-    for (const tile of this.state.players[playerIndex].hand) {
-      for (const target of this.getPlayableTargets(playerIndex, tile)) {
-        moves.push({ tileId: tile.id, tile, trainIndex: target.trainIndex });
-      }
-    }
-    return moves;
+    return getAllLegalMoves(this.state, playerIndex);
   }
 
   addLog(message) {
@@ -562,38 +491,15 @@ export class MexicanTrainScene extends Phaser.Scene {
   }
 
   drawForCurrentPlayer() {
-    if (this.state.boneyard.length === 0) {
-      return null;
-    }
-    const tile = this.state.boneyard.pop();
-    this.currentPlayer.hand.push(tile);
-    this.addLog(`${this.currentPlayer.name} drew ${tileLabel(tile)}.`);
-    return tile;
+    return drawForCurrentPlayer(this.state);
   }
 
   handleUnableToPlay(playerIndex) {
-    this.markTrainOpen(playerIndex, true);
-    const player = this.state.players[playerIndex];
-    if (this.state.openingPhase && !player.hasStartedTrain) {
-      this.state.turnMessage = `${player.name} could not start their train and opened it.`;
-      this.addLog(`${player.name} could not start their train and opened it.`);
-      return;
-    }
-    if (this.state.pendingDouble) {
-      this.state.turnMessage = `${player.name} could not cover the double. Their train is now open.`;
-      this.addLog(`${player.name} could not cover the double and opened their train.`);
-      return;
-    }
-    this.state.turnMessage = `${player.name} could not play and opened their train.`;
-    this.addLog(`${player.name} could not play and opened their train.`);
+    handleUnableToPlay(this.state, playerIndex);
   }
 
   finalizeScores() {
-    const roundScores = this.state.players.map((player) => summarizeHand(player.hand));
-    roundScores.forEach((score, index) => {
-      this.match.scores[index] += score;
-    });
-    return roundScores;
+    return finalizeScores(this.state, this.match);
   }
 
   endRound(winnerIndex, blocked) {
@@ -628,13 +534,11 @@ export class MexicanTrainScene extends Phaser.Scene {
   }
 
   getMatchLeaderIndex() {
-    return this.match.scores
-      .map((score, index) => ({ score, index, roundsWon: this.match.roundsWon[index] }))
-      .sort((left, right) => left.score - right.score || right.roundsWon - left.roundsWon)[0].index;
+    return getMatchLeaderIndex(this.match);
   }
 
   canAnyPlayerMove() {
-    return this.state.players.some((_, index) => this.getPlayableTiles(index).length > 0);
+    return canAnyPlayerMove(this.state);
   }
 
   checkStalemate() {
@@ -653,11 +557,15 @@ export class MexicanTrainScene extends Phaser.Scene {
     }
 
     const playerIndex = this.state.currentPlayer;
-    const move = this.chooseBotMove(this.getAllLegalMoves(playerIndex), playerIndex);
+    const move = chooseBotMove(this.state, this.settings, playerIndex);
     if (move) {
-      this.playTile(playerIndex, move.trainIndex, move.tileId);
+      const result = playTile(this.state, this.settings, playerIndex, move.trainIndex, move.tileId);
       this.render();
       if (this.state.roundOver) {
+        return;
+      }
+      if (this.state.players[playerIndex].hand.length === 0) {
+        this.endRound(playerIndex, false);
         return;
       }
       if (this.state.pendingDouble || this.state.extraTurnPending) {
@@ -672,12 +580,15 @@ export class MexicanTrainScene extends Phaser.Scene {
     }
 
     const drawnTile = this.drawForCurrentPlayer();
-    const drawnMoves = drawnTile ? this.getAllLegalMoves(playerIndex) : [];
-    const drawnMove = this.chooseBotMove(drawnMoves, playerIndex);
+    const drawnMove = drawnTile ? chooseBotMove(this.state, this.settings, playerIndex) : null;
     if (drawnMove) {
-      this.playTile(playerIndex, drawnMove.trainIndex, drawnMove.tileId);
+      playTile(this.state, this.settings, playerIndex, drawnMove.trainIndex, drawnMove.tileId);
       this.render();
       if (this.state.roundOver) {
+        return;
+      }
+      if (this.state.players[playerIndex].hand.length === 0) {
+        this.endRound(playerIndex, false);
         return;
       }
       if (this.state.pendingDouble || this.state.extraTurnPending) {
@@ -712,9 +623,13 @@ export class MexicanTrainScene extends Phaser.Scene {
       return;
     }
 
-    this.playTile(playerIndex, trainIndex, tile.id);
+    playTile(this.state, this.settings, playerIndex, trainIndex, tile.id);
     this.selectedTileId = null;
     this.render();
+    if (this.state.players[playerIndex].hand.length === 0) {
+      this.endRound(playerIndex, false);
+      return;
+    }
     if (this.state.roundOver) {
       return;
     }
@@ -780,182 +695,15 @@ export class MexicanTrainScene extends Phaser.Scene {
     this.startRound();
   }
 
-  renderBoard() {
-    this.ui.boardGroup.clear(true, true);
-    const center = { x: 760, y: 305 };
-    const anchors = getTrainAnchors(this.settings.totalPlayers);
-    const mexicanAnchor = { x: 760, y: 515, align: 'center' };
-    const trainAnchors = [...anchors, mexicanAnchor];
+  renderBoard() { renderBoard(this); }
 
-    const centerRing = this.add.circle(center.x, center.y, 76, 0xf6ecdc).setStrokeStyle(3, UI_COLORS.accent, 0.4);
-    const engineTile = createDominoSprite(this, { a: this.state.engineValue, b: this.state.engineValue }, center.x, center.y, {
-      vertical: true,
-      faceUp: true,
-    });
-    this.ui.boardGroup.addMultiple([centerRing, engineTile]);
+  renderHand() { renderHand(this); }
 
-    trainAnchors.forEach((anchor, trainIndex) => {
-      const train = this.state.trains[trainIndex];
-      const dx = anchor.x - center.x;
-      const dy = anchor.y - center.y;
-      const distance = Math.sqrt((dx * dx) + (dy * dy));
-      const ux = dx / distance;
-      const uy = dy / distance;
-      const selectedTile = this.getSelectedTile();
-      const enabled = this.canHumanAct() && selectedTile && this.canPlayOnTrain(this.state.currentPlayer, trainIndex, selectedTile);
-      const lineColor = enabled ? UI_COLORS.selected : (train.open || train.isMexican ? UI_COLORS.open : UI_COLORS.closed);
-      const rail = this.add.line(0, 0, center.x, center.y, anchor.x, anchor.y, lineColor, 0.42).setLineWidth(5, 5);
-      const endpoint = this.add.circle(anchor.x, anchor.y, 28, enabled ? 0xfff5db : 0xffffff).setStrokeStyle(3, lineColor, 1);
-      endpoint.setInteractive({ useHandCursor: true });
-      endpoint.on('pointerup', () => this.onTrainButton(trainIndex));
-      const zone = this.add.zone(anchor.x - 50, anchor.y - 34, 100, 68).setOrigin(0, 0).setRectangleDropZone(100, 68);
-      zone.setData('trainIndex', trainIndex);
+  renderScoreboard() { renderScoreboard(this); }
 
-      const labelLines = [train.name, `End ${train.endpoint} | ${train.isMexican ? 'public' : (train.open ? 'open' : 'closed')}`];
-      if (this.state.openingPhase && !train.isMexican && !this.state.players[train.ownerIndex].hasStartedTrain) {
-        labelLines.push('not started');
-      }
-      if (this.state.pendingDouble && this.state.pendingDouble.trainIndex === trainIndex) {
-        labelLines.push('cover required');
-      }
-      const labelX = anchor.align === 'left' ? anchor.x - 85 : (anchor.align === 'right' ? anchor.x + 85 : anchor.x);
-      const label = this.add.text(labelX, anchor.y - 10, labelLines.join('\n'), {
-        fontFamily: 'Georgia',
-        fontSize: '14px',
-        color: UI_COLORS.ink,
-        align: anchor.align === 'left' ? 'right' : (anchor.align === 'right' ? 'left' : 'center'),
-      }).setOrigin(anchor.align === 'left' ? 1 : (anchor.align === 'right' ? 0 : 0.5), 0.5);
+  renderPlayerSummary() { renderPlayerSummary(this); }
 
-      this.ui.boardGroup.addMultiple([rail, endpoint, zone, label]);
-
-      const visibleTiles = train.tiles.slice(-4);
-      const startDistance = Math.max(110, distance - ((visibleTiles.length - 1) * 72) - 48);
-      visibleTiles.forEach((tile, tileIndex) => {
-        const offset = startDistance + (tileIndex * 72);
-        const tileSprite = createDominoSprite(this, tile, center.x + (ux * offset), center.y + (uy * offset), {
-          vertical: Math.abs(uy) > Math.abs(ux) || isDouble(tile),
-          faceUp: true,
-          highlight: this.state.pendingDouble && this.state.pendingDouble.trainIndex === trainIndex && tileIndex === visibleTiles.length - 1 && isDouble(tile),
-        });
-        this.ui.boardGroup.add(tileSprite);
-      });
-    });
-  }
-
-  renderHand() {
-    this.ui.handGroup.clear(true, true);
-    if (this.state.roundOver) {
-      this.ui.handTitle.setText('Round complete');
-      this.ui.handHint.setText('Use Next to continue, or return to the title screen after the match.');
-      return;
-    }
-    if (!this.currentPlayer.isHuman) {
-      this.ui.handTitle.setText('Bot turn');
-      this.ui.handHint.setText(`${this.currentPlayer.name} is evaluating moves at ${DIFFICULTY_SETTINGS[this.settings.difficulty].label.toLowerCase()} difficulty.`);
-      return;
-    }
-    if (this.state.humanRevealPending) {
-      this.ui.handTitle.setText('Hand hidden');
-      this.ui.handHint.setText('Reveal the hand when the next player is ready.');
-      return;
-    }
-
-    this.ui.handTitle.setText(`${this.currentPlayer.name} Hand`);
-    this.ui.handHint.setText('Drag a domino onto a train endpoint, or click a domino and then click an endpoint.');
-    const hand = [...this.currentPlayer.hand].sort((left, right) => pipSum(right) - pipSum(left) || right.a - left.a);
-    hand.forEach((tile, index) => {
-      const column = index % 8;
-      const row = Math.floor(index / 8);
-      const x = 392 + (column * 102);
-      const y = 654 + (row * 64);
-      const playable = this.getPlayableTargets(this.state.currentPlayer, tile).length > 0;
-      const selected = tile.id === this.selectedTileId;
-      const domino = createDominoSprite(this, tile, x, y, {
-        vertical: false,
-        faceUp: true,
-        highlight: selected || playable,
-        tileId: tile.id,
-        interactive: true,
-      });
-      domino.list[1].setFillStyle(selected ? UI_COLORS.selected : (playable ? UI_COLORS.playable : UI_COLORS.muted), 1);
-      this.input.setDraggable(domino, true);
-      domino.on('pointerup', () => {
-        if (!this.canHumanAct() || this.draggingTileId === tile.id) {
-          return;
-        }
-        this.selectedTileId = this.selectedTileId === tile.id ? null : tile.id;
-        this.render();
-      });
-      this.ui.handGroup.add(domino);
-    });
-  }
-
-  renderScoreboard() {
-    const openingText = this.state.openingPhase ? 'Opening phase active' : 'Regular play';
-    const lines = [
-      'Match Scoreboard',
-      `Difficulty: ${DIFFICULTY_SETTINGS[this.settings.difficulty].label}`,
-      `Double: ${DOUBLE_RULE_SETTINGS[this.settings.doubleRule].label}`,
-      `Mode: ${this.settings.humanPlayers} human / ${this.settings.totalPlayers - this.settings.humanPlayers} bot`,
-      `State: ${openingText}`,
-    ];
-    this.state.players.forEach((player, index) => {
-      lines.push(`${player.name}: ${this.match.scores[index]} total, ${this.match.roundsWon[index]} rounds won`);
-    });
-    if (this.state.lastRoundScores) {
-      lines.push('Last Round:');
-      this.state.players.forEach((player, index) => {
-        lines.push(`${player.name}: +${this.state.lastRoundScores[index]}`);
-      });
-    }
-    this.ui.scoreboard.setText(lines.join('\n'));
-  }
-
-  renderPlayerSummary() {
-    const lines = ['Player Trains'];
-    this.state.players.forEach((player, index) => {
-      const train = this.state.trains[index];
-      const shortName = player.name.replace('Player ', 'P').replace('Bot ', 'B');
-      const openFlag = train.open ? 'O' : 'C';
-      const startFlag = player.hasStartedTrain ? 'S' : 'N';
-      lines.push(`${shortName}: hand ${player.hand.length}, end ${train.endpoint}, ${openFlag}, ${startFlag}`);
-    });
-    lines.push(`Mexican: end ${this.state.trains[this.getMexicanTrainIndex()].endpoint}`);
-    lines.push(`Yard: ${this.state.boneyard.length}`);
-    this.ui.playerSummary.setText(lines.join('\n'));
-  }
-
-  renderStatus() {
-    const pendingText = this.state.pendingDouble ? ` Pending double on ${this.state.trains[this.state.pendingDouble.trainIndex].name}.` : '';
-    const openingHint = this.state.openingPhase ? ' During the opening phase, players may only work on their own trains.' : '';
-    this.ui.roundMeta.setText(`Round ${this.match.roundIndex + 1} of ${TOTAL_ROUNDS} | Engine ${this.state.engineValue}|${this.state.engineValue}`);
-    this.ui.status.setText(`${this.state.turnMessage}${pendingText}${openingHint}`);
-    this.ui.boardHint.setText(this.state.openingPhase
-      ? 'Each player must establish their personal train before shared and open-train play begins.'
-      : 'The Mexican Train is always public. Open trains may be used by any player.');
-    this.ui.log.setText(this.state.log.join('\n'));
-    this.ui.historyText.setText(this.match.history.length > 0
-      ? this.match.history.map((entry) => `R${entry.round}: ${this.state.players[entry.winnerIndex]?.name || `P${entry.winnerIndex + 1}`} ${entry.blocked ? 'blocked' : 'out'} + ${entry.scores.join('/')}`).join('\n')
-      : 'No completed rounds yet.');
-
-    this.ui.drawButton.setFillStyle(this.canHumanAct() ? UI_COLORS.accentAlt : UI_COLORS.disabled, 1);
-    this.ui.advanceButton.setFillStyle(this.state.roundOver ? UI_COLORS.accent : UI_COLORS.disabled, 1);
-    this.ui.advanceLabel.setText(this.match.completed ? 'Finish' : 'Next');
-    this.ui.sidebarToggleLabel.setText(this.ui.sidebarExpanded ? 'Hide' : 'Show');
-
-    this.ui.scoreboard.setVisible(this.ui.sidebarExpanded);
-    this.ui.playerSummary.setVisible(this.ui.sidebarExpanded);
-    this.ui.log.setVisible(this.ui.sidebarExpanded);
-    this.ui.historyPanel.setVisible(this.ui.sidebarExpanded);
-    this.ui.historyText.setVisible(this.ui.sidebarExpanded);
-
-    const overlayVisible = this.currentPlayer.isHuman && this.state.humanRevealPending && !this.state.roundOver;
-    this.ui.overlay.setVisible(overlayVisible);
-    if (overlayVisible) {
-      this.ui.overlayTitle.setText(`${this.currentPlayer.name}'s Turn`);
-      this.ui.overlayBody.setText('Hands are hidden between human players.\nReveal the hand when this player is ready.');
-    }
-  }
+  renderStatus() { renderStatus(this); }
 
   render() {
     if (!this.state) {
