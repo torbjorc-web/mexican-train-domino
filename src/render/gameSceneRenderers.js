@@ -110,14 +110,15 @@ export function renderHand(scene) {
 
   scene.ui.handTitle.setText(`${scene.currentPlayer.name} Hand`);
   scene.ui.handHint.setText('Drag a domino onto a train endpoint, or click a domino and then click an endpoint.');
-  scene.ui.handTitle.setPosition(340, 540);
-  scene.ui.handHint.setPosition(340, 568);
+  scene.ui.handTitle.setPosition(330, 536);
+  scene.ui.handHint.setPosition(330, 564);
   const hand = [...scene.currentPlayer.hand].sort((left, right) => pipSum(right) - pipSum(left) || right.a - left.a);
+  const columns = 7;
   hand.forEach((tile, index) => {
-    const column = index % 8;
-    const row = Math.floor(index / 8);
-    const x = 340 + (column * 88);
-    const y = 592 + (row * 50);
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const x = 330 + (column * 82);
+    const y = 586 + (row * 48);
     const playable = scene.getPlayableTargets(scene.state.currentPlayer, tile).length > 0;
     const selected = tile.id === scene.selectedTileId;
     const domino = createDominoSprite(scene, tile, x, y, {
@@ -127,7 +128,7 @@ export function renderHand(scene) {
       tileId: tile.id,
       interactive: true,
     });
-    domino.setScale(0.85);
+    domino.setScale(0.8);
     domino.list[1].setFillStyle(selected ? UI_COLORS.selected : (playable ? UI_COLORS.playable : UI_COLORS.muted), 1);
     scene.input.setDraggable(domino, true);
     domino.on('pointerup', () => {
