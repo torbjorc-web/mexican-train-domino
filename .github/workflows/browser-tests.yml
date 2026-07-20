@@ -21,5 +21,10 @@ jobs:
       - name: Start static server
         run: python -m http.server 8000 &
 
+      - name: Install Playwright and browser
+        run: |
+          npm install playwright
+          npx playwright install --with-deps chromium
+
       - name: Run browser test harness
-        run: npx -y -p playwright node .github/workflows/run-browser-tests.mjs
+        run: node .github/workflows/run-browser-tests.mjs
