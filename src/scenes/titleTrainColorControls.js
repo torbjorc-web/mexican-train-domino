@@ -6,34 +6,34 @@ import {
 import { UI_COLORS } from '../config/gameConfig.js';
 
 export function createTrainColorSelector(scene, y, index) {
-  const container = scene.add.container(905, y);
-  const label = scene.add.text(-145, 0, `Player ${index + 1}`, {
+  const container = scene.add.container(1020, y);
+  const label = scene.add.text(-92, 0, `Player ${index + 1}`, {
     fontFamily: 'Georgia',
-    fontSize: '16px',
+    fontSize: '15px',
     color: UI_COLORS.ink,
     fontStyle: 'bold',
   }).setOrigin(1, 0.5);
-  const left = scene.add.rectangle(-100, 0, 34, 34, UI_COLORS.panelDark)
+  const left = scene.add.rectangle(-42, 0, 34, 34, UI_COLORS.panelDark)
     .setStrokeStyle(2, UI_COLORS.accent, 1)
     .setInteractive({ useHandCursor: true });
-  const leftText = scene.add.text(-100, 0, '<', {
+  const leftText = scene.add.text(-42, 0, '<', {
     fontFamily: 'Georgia',
     fontSize: '22px',
     color: UI_COLORS.ink,
     fontStyle: 'bold',
   }).setOrigin(0.5, 0.5).setInteractive({ useHandCursor: true });
-  const valueBox = scene.add.rectangle(10, 0, 170, 38, UI_COLORS.playable)
+  const valueBox = scene.add.rectangle(68, 0, 170, 38, UI_COLORS.playable)
     .setStrokeStyle(2, UI_COLORS.accentAlt, 1);
-  const valueText = scene.add.text(10, 0, '', {
+  const valueText = scene.add.text(68, 0, '', {
     fontFamily: 'Georgia',
     fontSize: '16px',
     color: UI_COLORS.ink,
     fontStyle: 'bold',
   }).setOrigin(0.5, 0.5);
-  const right = scene.add.rectangle(112, 0, 34, 34, UI_COLORS.panelDark)
+  const right = scene.add.rectangle(172, 0, 34, 34, UI_COLORS.panelDark)
     .setStrokeStyle(2, UI_COLORS.accent, 1)
     .setInteractive({ useHandCursor: true });
-  const rightText = scene.add.text(112, 0, '>', {
+  const rightText = scene.add.text(172, 0, '>', {
     fontFamily: 'Georgia',
     fontSize: '22px',
     color: UI_COLORS.ink,

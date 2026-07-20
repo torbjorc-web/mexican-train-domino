@@ -28,13 +28,13 @@ export class TitleScene extends Phaser.Scene {
     this.add.rectangle(640, 360, 1240, 700, UI_COLORS.panel).setStrokeStyle(3, UI_COLORS.accent, 0.35);
     this.add.text(640, 88, 'Mexican Train Dominoes', {
       fontFamily: 'Georgia',
-      fontSize: '40px',
+      fontSize: '36px',
       color: UI_COLORS.ink,
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5);
     this.add.text(640, 145, 'Pass-and-play setup with configurable human players, rules, and bot difficulty.', {
       fontFamily: 'Georgia',
-      fontSize: '18px',
+      fontSize: '16px',
       color: UI_COLORS.ink,
     }).setOrigin(0.5, 0.5);
 
@@ -48,7 +48,7 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.humanPlayers = this.createSelector(340, 'Human Players', () => `${this.settings.humanPlayers}`, () => {
+    this.ui.humanPlayers = this.createSelector(338, 'Human Players', () => `${this.settings.humanPlayers}`, () => {
       this.settings.humanPlayers = this.settings.humanPlayers === 1 ? this.settings.totalPlayers : this.settings.humanPlayers - 1;
       this.refreshSelectors();
     }, () => {
@@ -56,7 +56,7 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.difficulty = this.createSelector(430, 'Bot Difficulty', () => DIFFICULTY_SETTINGS[this.settings.difficulty].label, () => {
+    this.ui.difficulty = this.createSelector(426, 'Bot Difficulty', () => DIFFICULTY_SETTINGS[this.settings.difficulty].label, () => {
       this.settings.difficulty = this.getAdjacentDifficulty(-1);
       this.refreshSelectors();
     }, () => {
@@ -64,7 +64,7 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.strictOpening = this.createSelector(520, 'Opening Rule', () => (this.settings.strictOpening ? 'Strict Start' : 'Free Start'), () => {
+    this.ui.strictOpening = this.createSelector(514, 'Opening Rule', () => (this.settings.strictOpening ? 'Strict Start' : 'Free Start'), () => {
       this.settings.strictOpening = !this.settings.strictOpening;
       this.refreshSelectors();
     }, () => {
@@ -72,7 +72,7 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.doubleRule = this.createSelector(610, 'Double Rule', () => DOUBLE_RULE_SETTINGS[this.settings.doubleRule].label, () => {
+    this.ui.doubleRule = this.createSelector(602, 'Double Rule', () => DOUBLE_RULE_SETTINGS[this.settings.doubleRule].label, () => {
       this.settings.doubleRule = this.settings.doubleRule === 'cover' ? 'extraTurn' : 'cover';
       this.refreshSelectors();
     }, () => {
@@ -80,44 +80,44 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.trainColorHeader = this.add.text(1010, 190, 'Train Colors', {
+    this.ui.trainColorHeader = this.add.text(1105, 190, 'Train Colors', {
       fontFamily: 'Georgia',
       fontSize: '20px',
       color: UI_COLORS.ink,
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5);
 
-    this.ui.trainColorSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createTrainColorSelector(this, 222 + (index * 30), index));
+    this.ui.trainColorSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createTrainColorSelector(this, 232 + (index * 44), index));
 
-    this.ui.playerNameHeader = this.add.text(1010, 420, 'Player Names', {
+    this.ui.playerNameHeader = this.add.text(1105, 430, 'Player Names', {
       fontFamily: 'Georgia',
       fontSize: '20px',
       color: UI_COLORS.ink,
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5);
 
-    this.ui.playerNameSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createPlayerNameSelector(this, 452 + (index * 30), index));
+    this.ui.playerNameSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createPlayerNameSelector(this, 472 + (index * 42), index));
 
-    this.ui.highScoreHeader = this.add.text(1010, 620, 'High Scores', {
+    this.ui.highScoreHeader = this.add.text(1105, 628, 'High Scores', {
       fontFamily: 'Georgia',
       fontSize: '20px',
       color: UI_COLORS.ink,
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5);
 
-    this.ui.highScoreText = this.add.text(1010, 646, '', {
+    this.ui.highScoreText = this.add.text(1105, 654, '', {
       fontFamily: 'Georgia',
       fontSize: '13px',
       color: UI_COLORS.ink,
       align: 'left',
-      wordWrap: { width: 360 },
+      wordWrap: { width: 280 },
       lineSpacing: 2,
     }).setOrigin(0.5, 0);
 
-    const startButton = this.add.rectangle(640, 670, 280, 64, UI_COLORS.accent)
+    const startButton = this.add.rectangle(640, 668, 280, 64, UI_COLORS.accent)
       .setStrokeStyle(2, 0x7c2914, 1)
       .setInteractive({ useHandCursor: true });
-    const startLabel = this.add.text(640, 670, 'Start Match', {
+    const startLabel = this.add.text(640, 668, 'Start Match', {
       fontFamily: 'Georgia',
       fontSize: '28px',
       color: '#ffffff',
@@ -134,34 +134,34 @@ export class TitleScene extends Phaser.Scene {
   }
 
   createSelector(y, label, getValue, onPrev, onNext) {
-    this.add.text(430, y, label, {
+    this.add.text(400, y, label, {
       fontFamily: 'Georgia',
-      fontSize: '24px',
+      fontSize: '22px',
       color: UI_COLORS.ink,
       fontStyle: 'bold',
     }).setOrigin(1, 0.5);
-    const left = this.add.rectangle(485, y, 50, 50, UI_COLORS.panelDark)
+    const left = this.add.rectangle(470, y, 46, 46, UI_COLORS.panelDark)
       .setStrokeStyle(2, UI_COLORS.accent, 1)
       .setInteractive({ useHandCursor: true });
-    const right = this.add.rectangle(795, y, 50, 50, UI_COLORS.panelDark)
+    const right = this.add.rectangle(770, y, 46, 46, UI_COLORS.panelDark)
       .setStrokeStyle(2, UI_COLORS.accent, 1)
       .setInteractive({ useHandCursor: true });
-    this.add.text(485, y, '<', {
+    this.add.text(470, y, '<', {
       fontFamily: 'Georgia',
-      fontSize: '28px',
+      fontSize: '26px',
       color: UI_COLORS.ink,
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5).setInteractive({ useHandCursor: true }).on('pointerup', onPrev);
-    this.add.text(795, y, '>', {
+    this.add.text(770, y, '>', {
       fontFamily: 'Georgia',
-      fontSize: '28px',
+      fontSize: '26px',
       color: UI_COLORS.ink,
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5).setInteractive({ useHandCursor: true }).on('pointerup', onNext);
-    this.add.rectangle(640, y, 250, 56, UI_COLORS.playable).setStrokeStyle(2, UI_COLORS.accentAlt, 1);
+    this.add.rectangle(620, y, 220, 52, UI_COLORS.playable).setStrokeStyle(2, UI_COLORS.accentAlt, 1);
     const valueText = this.add.text(640, y, '', {
       fontFamily: 'Georgia',
-      fontSize: '24px',
+      fontSize: '22px',
       color: UI_COLORS.ink,
     }).setOrigin(0.5, 0.5);
     left.on('pointerup', onPrev);

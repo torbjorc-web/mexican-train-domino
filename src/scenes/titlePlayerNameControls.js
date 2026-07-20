@@ -12,25 +12,25 @@ function promptForName(scene, index) {
 }
 
 export function createPlayerNameSelector(scene, y, index) {
-  const label = scene.add.text(905, y, `Player ${index + 1}`, {
+  const label = scene.add.text(1015, y, `Player ${index + 1}`, {
     fontFamily: 'Georgia',
     fontSize: '16px',
     color: UI_COLORS.ink,
     fontStyle: 'bold',
   }).setOrigin(1, 0.5);
-  const valueBox = scene.add.rectangle(1055, y, 170, 30, UI_COLORS.playable)
+  const valueBox = scene.add.rectangle(1165, y, 170, 30, UI_COLORS.playable)
     .setStrokeStyle(2, UI_COLORS.accentAlt, 1)
     .setInteractive({ useHandCursor: true });
-  const valueText = scene.add.text(1055, y, '', {
+  const valueText = scene.add.text(1165, y, '', {
     fontFamily: 'Georgia',
     fontSize: '15px',
     color: UI_COLORS.ink,
     fontStyle: 'bold',
   }).setOrigin(0.5, 0.5).setInteractive({ useHandCursor: true });
-  const editButton = scene.add.rectangle(1160, y, 34, 30, UI_COLORS.panelDark)
+  const editButton = scene.add.rectangle(1270, y, 34, 30, UI_COLORS.panelDark)
     .setStrokeStyle(2, UI_COLORS.accent, 1)
     .setInteractive({ useHandCursor: true });
-  const editText = scene.add.text(1160, y, 'Edit', {
+  const editText = scene.add.text(1270, y, 'Edit', {
     fontFamily: 'Georgia',
     fontSize: '12px',
     color: UI_COLORS.ink,
