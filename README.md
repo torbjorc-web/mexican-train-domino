@@ -19,13 +19,19 @@ This workspace contains a Phaser.js browser prototype of Mexican Train Dominoes.
 
 ## Controls
 
-- Use the title screen to choose total players, how many are human, and the bot difficulty.
+- Use the title screen to choose total players, how many are human, the bot difficulty, each human player's name, and each human train color.
 - Human turns are pass-and-play. Reveal the current hand when the next player is ready.
 - Drag a domino from your hand onto a train endpoint.
 - Or click a domino in your hand to select it and click a highlighted endpoint.
 - Click `Draw / Pass` if you cannot play.
 - Click `Next Round` after a round ends.
 - Return to the title screen after round 13 finishes to start a new match with new settings.
+
+## Extras
+
+- Each train now has its own visible color in the station view, and human train colors must stay unique.
+- Human player names are saved for the match and shown in the score and train summaries.
+- Completed match results are stored as local high scores in the browser.
 
 ## Bot behavior
 
@@ -55,3 +61,8 @@ http://localhost:8000/tests/run-tests.html
 ```
 
 These tests exercise the shared state module directly in the browser without npm or an external test runner.
+
+## Notes
+
+- The prototype still runs directly in the browser from a static server.
+- If you change gameplay rules or player setup, remember to update this README so the controls and stored-match behavior stay in sync.

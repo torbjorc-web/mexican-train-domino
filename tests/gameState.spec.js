@@ -6,7 +6,12 @@ import {
   getMexicanTrainIndex,
   normalizeSettings,
   playTile,
-} from '../src/state/gameState.js';
+} from '../src/state/gameState.js?v=2';
+import {
+  formatHighScoreEntry,
+  loadHighScores,
+  recordHighScore,
+} from '../src/state/highScoreStore.js';
 
 function assert(condition, message) {
   if (!condition) {
@@ -18,6 +23,18 @@ function forceSingleTileHand(state, playerIndex, tile, endpoint) {
   state.players[playerIndex].hand = [tile];
   state.trains[playerIndex].endpoint = endpoint;
   state.players[playerIndex].hasStartedTrain = false;
+}
+
+function createMockStorage() {
+  const data = new Map();
+  return {
+    getItem(key) {
+      return data.has(key) ? data.get(key) : null;
+    },
+    setItem(key, value) {
+      data.set(key, value);
+    },
+  };
 }
 
 export function runGameStateTests() {
@@ -66,6 +83,8 @@ export function runGameStateTests() {
   const botSettings = normalizeSettings({ totalPlayers: 4, humanPlayers: 1, strictOpening: false, doubleRule: 'cover' });
   const botMatch = createMatchState(botSettings);
   const botRound = createRoundState(botMatch, botSettings);
+  const guaranteedBotTile = { id: 9995, a: botRound.engineValue, b: 5 };
+  forceSingleTileHand(botRound, 1, guaranteedBotTile, botRound.engineValue);
   const botMoves = getAllLegalMoves(botRound, 1);
   assert(botMoves.length > 0, 'A fresh round should usually give the next player at least one legal opening move');
   results.push('legal move generation returns playable moves for bot turns');
@@ -83,6 +102,15 @@ export function runGameStateTests() {
   assert(new Set(assignedColors).size === assignedColors.length, 'Every train should receive a unique color');
   assert(colorRound.players.slice(0, 3).every((player) => Boolean(player.colorKey)), 'Human players should have explicit train colors');
   results.push('train color assignment keeps every train unique');
+
+  const storage = createMockStorage();
+  recordHighScore({ name: 'Ada', score: 42, players: 4, roundsWon: 3 }, storage);
+  recordHighScore({ name: 'Bea', score: 18, players: 5, roundsWon: 4 }, storage);
+  const highScores = loadHighScores(storage);
+  assert(highScores.length === 2, 'High score storage should retain saved entries');
+  assert(highScores[0].name === 'Bea', 'Lower scores should sort first');
+  assert(formatHighScoreEntry(highScores[0], 0).includes('Bea: 18'), 'High score entries should format for display');
+  results.push('high score storage keeps the best scores ordered first');
 
   return results;
 }

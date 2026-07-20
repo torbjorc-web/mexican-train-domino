@@ -6,10 +6,11 @@ import {
   MIN_PLAYERS,
   UI_COLORS,
 } from '../config/gameConfig.js';
-import { getTrainColorLabel } from '../config/trainColors.js';
-import { normalizeSettings } from '../state/gameState.js';
+import { formatHighScoreEntry, loadHighScores } from '../state/highScoreStore.js';
+import { normalizeSettings } from '../state/gameState.js?v=2';
 import { clamp } from '../utils/dominoes.js';
-import { createTrainColorSelector, refreshTrainColorSelectors } from './titleTrainColorControls.js';
+import { createTrainColorSelector, refreshTrainColorSelectors } from './titleTrainColorControls.js?v=2';
+import { createPlayerNameSelector, refreshPlayerNameSelectors } from './titlePlayerNameControls.js?v=2';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -86,16 +87,32 @@ export class TitleScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5);
 
-    this.ui.trainColorSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createTrainColorSelector(this, 230 + (index * 34), index));
+    this.ui.trainColorSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createTrainColorSelector(this, 222 + (index * 30), index));
 
-    this.ui.summary = this.add.text(1010, 470, '', {
+    this.ui.playerNameHeader = this.add.text(1010, 420, 'Player Names', {
       fontFamily: 'Georgia',
-      fontSize: '16px',
+      fontSize: '20px',
+      color: UI_COLORS.ink,
+      fontStyle: 'bold',
+    }).setOrigin(0.5, 0.5);
+
+    this.ui.playerNameSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createPlayerNameSelector(this, 452 + (index * 30), index));
+
+    this.ui.highScoreHeader = this.add.text(1010, 620, 'High Scores', {
+      fontFamily: 'Georgia',
+      fontSize: '20px',
+      color: UI_COLORS.ink,
+      fontStyle: 'bold',
+    }).setOrigin(0.5, 0.5);
+
+    this.ui.highScoreText = this.add.text(1010, 646, '', {
+      fontFamily: 'Georgia',
+      fontSize: '13px',
       color: UI_COLORS.ink,
       align: 'left',
       wordWrap: { width: 360 },
-      lineSpacing: 4,
-    }).setOrigin(0.5, 0.5);
+      lineSpacing: 2,
+    }).setOrigin(0.5, 0);
 
     const startButton = this.add.rectangle(640, 670, 280, 64, UI_COLORS.accent)
       .setStrokeStyle(2, 0x7c2914, 1)
@@ -165,14 +182,11 @@ export class TitleScene extends Phaser.Scene {
     this.ui.strictOpening.valueText.setText(this.ui.strictOpening.getValue());
     this.ui.doubleRule.valueText.setText(this.ui.doubleRule.getValue());
     refreshTrainColorSelectors(this);
+    refreshPlayerNameSelectors(this);
 
-    const botCount = this.settings.totalPlayers - this.settings.humanPlayers;
-    this.ui.summary.setText([
-      `${this.settings.humanPlayers} human ${this.settings.humanPlayers === 1 ? 'player' : 'players'} and ${botCount} ${botCount === 1 ? 'bot' : 'bots'}.`,
-      `Opening rule: ${this.settings.strictOpening ? 'everyone starts their own train first' : 'free opening on any eligible train'}.`,
-      `Double rule: ${DOUBLE_RULE_SETTINGS[this.settings.doubleRule].label.toLowerCase()}.`,
-      `Bots use the ${DIFFICULTY_SETTINGS[this.settings.difficulty].label.toLowerCase()} heuristic set.`,
-      `Train colors: ${this.settings.humanTrainColors.slice(0, this.settings.humanPlayers).map((colorKey, index) => `P${index + 1} ${getTrainColorLabel(colorKey)}`).join(', ')}.`,
-    ].join('\n'));
+    const highScores = loadHighScores();
+    this.ui.highScoreText.setText(highScores.length > 0
+      ? highScores.slice(0, 5).map((entry, index) => formatHighScoreEntry(entry, index)).join('\n')
+      : 'No stored high scores yet.');
   }
 }

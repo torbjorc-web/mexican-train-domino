@@ -9,8 +9,9 @@ import {
 import {
   MEXICAN_TRAIN_COLOR,
   TRAIN_COLOR_OPTIONS,
+  normalizeHumanPlayerNames as normalizeHumanPlayerNamesFromColors,
   normalizeHumanTrainColors,
-} from '../config/trainColors.js';
+} from '../config/trainColors.js?v=2';
 import {
   clamp,
   cloneTile,
@@ -32,6 +33,7 @@ export function normalizeSettings(settings) {
   };
   next.totalPlayers = clamp(next.totalPlayers, MIN_PLAYERS, MAX_PLAYERS);
   next.humanPlayers = clamp(next.humanPlayers, 1, next.totalPlayers);
+  next.humanPlayerNames = normalizeHumanPlayerNamesFromColors(next.humanPlayerNames, next.humanPlayers);
   next.humanTrainColors = normalizeHumanTrainColors(next.humanTrainColors, next.humanPlayers);
   if (!DIFFICULTY_SETTINGS[next.difficulty]) {
     next.difficulty = DEFAULT_SETTINGS.difficulty;
@@ -42,13 +44,28 @@ export function normalizeSettings(settings) {
   return next;
 }
 
+export function normalizeHumanPlayerNames(playerNames = [], humanPlayers = 1) {
+  return Array.from({ length: humanPlayers }, (_, index) => {
+    const candidate = `${playerNames[index] || ''}`.trim();
+    return candidate || `Player ${index + 1}`;
+  });
+}
+
+function buildPlayerNames(settings) {
+  const humanNames = normalizeHumanPlayerNamesFromColors(settings.humanPlayerNames, settings.humanPlayers);
+  return Array.from({ length: settings.totalPlayers }, (_, index) => (
+    index < settings.humanPlayers
+      ? humanNames[index]
+      : `Bot ${index - settings.humanPlayers + 1}`
+  ));
+}
+
 function buildPlayerColorKeys(settings) {
   const humanColorKeys = normalizeHumanTrainColors(settings.humanTrainColors, settings.humanPlayers);
   const used = new Set(humanColorKeys);
   const remainingColorKeys = TRAIN_COLOR_OPTIONS
     .map((option) => option.key)
     .filter((colorKey) => !used.has(colorKey));
-
   return Array.from({ length: settings.totalPlayers }, (_, index) => (
     index < settings.humanPlayers
       ? humanColorKeys[index]
@@ -71,9 +88,10 @@ export function createRoundState(match, settings) {
   const totalPlayers = settings.totalPlayers;
   const handSize = getHandSize(totalPlayers);
   const playerColorKeys = buildPlayerColorKeys(settings);
+  const playerNames = buildPlayerNames(settings);
   const deck = shuffle(createDominoSet().filter((tile) => !(tile.a === engineValue && tile.b === engineValue)));
   const players = Array.from({ length: totalPlayers }, (_, index) => ({
-    name: index < settings.humanPlayers ? `Player ${index + 1}` : `Bot ${index - settings.humanPlayers + 1}`,
+    name: playerNames[index],
     hand: [],
     isHuman: index < settings.humanPlayers,
     hasStartedTrain: false,

@@ -23,7 +23,8 @@ import {
   handleUnableToPlay,
   normalizeSettings,
   playTile,
-} from '../state/gameState.js';
+} from '../state/gameState.js?v=2';
+import { recordHighScore } from '../state/highScoreStore.js';
 import {
   renderBoard,
   renderHand,
@@ -540,6 +541,12 @@ export class MexicanTrainScene extends Phaser.Scene {
       const champion = this.getMatchLeaderIndex();
       this.state.turnMessage = `${this.state.players[champion].name} wins the match with ${this.match.scores[champion]} points.`;
       this.addLog(`Match complete. ${this.state.players[champion].name} finished lowest.`);
+      recordHighScore({
+        name: this.state.players[champion].name,
+        score: this.match.scores[champion],
+        players: this.settings.totalPlayers,
+        roundsWon: this.match.roundsWon[champion],
+      });
     }
 
     this.render();

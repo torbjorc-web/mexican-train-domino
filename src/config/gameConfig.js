@@ -51,6 +51,7 @@ export const DOUBLE_RULE_SETTINGS = {
 export const DEFAULT_SETTINGS = {
   totalPlayers: 4,
   humanPlayers: 1,
+  humanPlayerNames: ['Player 1'],
   humanTrainColors: ['crimson'],
   difficulty: 'normal',
   strictOpening: true,

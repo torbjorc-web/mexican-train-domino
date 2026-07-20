@@ -66,3 +66,10 @@ export function getNextTrainColorKey(colorKeys = [], humanIndex = 0, direction =
 
   return currentKey;
 }
+
+export function normalizeHumanPlayerNames(playerNames = [], humanPlayers = 1) {
+  return Array.from({ length: humanPlayers }, (_, index) => {
+    const candidate = `${playerNames[index] || ''}`.trim();
+    return candidate || `Player ${index + 1}`;
+  });
+}

@@ -4,9 +4,26 @@ import {
   TOTAL_ROUNDS,
   UI_COLORS,
 } from '../config/gameConfig.js';
-import { getTrainColorLabel, getTrainColorStyle } from '../config/trainColors.js';
+import { getTrainColorLabel, getTrainColorStyle } from '../config/trainColors.js?v=2';
 import { createDominoSprite } from './createDominoSprite.js';
 import { getTrainAnchors, isDouble, pipSum } from '../utils/dominoes.js';
+
+function resolveTrainColorKey(scene, train, trainIndex) {
+  if (train.colorKey) {
+    return train.colorKey;
+  }
+  if (scene.state.players[trainIndex]?.colorKey) {
+    return scene.state.players[trainIndex].colorKey;
+  }
+  if (train.isMexican) {
+    return 'mexican';
+  }
+  if (trainIndex < scene.settings.humanPlayers && scene.settings.humanTrainColors?.[trainIndex]) {
+    return scene.settings.humanTrainColors[trainIndex];
+  }
+  const fallbackIndex = Math.max(0, trainIndex - scene.settings.humanPlayers);
+  return ['crimson', 'gold', 'teal', 'navy', 'plum', 'olive'][fallbackIndex] || 'crimson';
+}
 
 export function renderBoard(scene) {
   scene.ui.boardGroup.clear(true, true);
@@ -24,7 +41,7 @@ export function renderBoard(scene) {
 
   trainAnchors.forEach((anchor, trainIndex) => {
     const train = scene.state.trains[trainIndex];
-    const trainColor = getTrainColorStyle(train.colorKey);
+    const trainColor = getTrainColorStyle(resolveTrainColorKey(scene, train, trainIndex));
     const dx = anchor.x - center.x;
     const dy = anchor.y - center.y;
     const distance = Math.sqrt((dx * dx) + (dy * dy));
@@ -41,9 +58,7 @@ export function renderBoard(scene) {
     zone.setData('trainIndex', trainIndex);
 
     const labelLines = [train.name, `End ${train.endpoint} | ${train.isMexican ? 'public' : (train.open ? 'open' : 'closed')}`];
-    if (train.colorKey) {
-      labelLines.push(getTrainColorLabel(train.colorKey));
-    }
+    labelLines.push(getTrainColorLabel(resolveTrainColorKey(scene, train, trainIndex)));
     if (scene.state.openingPhase && !train.isMexican && !scene.state.players[train.ownerIndex].hasStartedTrain) {
       labelLines.push('not started');
     }
@@ -150,7 +165,7 @@ export function renderPlayerSummary(scene) {
     const shortName = player.name.replace('Player ', 'P').replace('Bot ', 'B');
     const openFlag = train.open ? 'O' : 'C';
     const startFlag = player.hasStartedTrain ? 'S' : 'N';
-    lines.push(`${shortName}: hand ${player.hand.length}, end ${train.endpoint}, ${openFlag}, ${startFlag}, ${getTrainColorLabel(train.colorKey)}`);
+    lines.push(`${shortName}: hand ${player.hand.length}, end ${train.endpoint}, ${openFlag}, ${startFlag}, ${getTrainColorLabel(resolveTrainColorKey(scene, train, index))}`);
   });
   lines.push(`Mexican: end ${scene.state.trains[scene.getMexicanTrainIndex()].endpoint}`);
   lines.push(`Yard: ${scene.state.boneyard.length}`);
