@@ -45,3 +45,13 @@ python -m http.server 8000
 ```
 
 Then open `http://localhost:8000` in a browser.
+
+## Browser tests
+
+You can run the lightweight browser-based rules tests by opening:
+
+```text
+http://localhost:8000/tests/run-tests.html
+```
+
+These tests exercise the shared state module directly in the browser without npm or an external test runner.

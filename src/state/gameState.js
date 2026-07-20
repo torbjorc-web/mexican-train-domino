@@ -180,140 +180,139 @@ export function playTile(state, settings, playerIndex, trainIndex, tileId) {
   state.extraTurnPending = false;
   train.tiles.push(cloneTile(tile));
   train.endpoint = nextEndpoint;
-+  if (!train.isMexican && train.ownerIndex === playerIndex) {
-+    train.open = false;
-+    state.players[playerIndex].hasStartedTrain = true;
-+  }
-+
-+  const actor = state.players[playerIndex].name;
-+  pushLog(state, `${actor} played ${tileLabel(tile)} on ${train.name}.`);
-+
-+  if (isDouble(tile) && settings.doubleRule === 'cover') {
-+    state.pendingDouble = { trainIndex, value: tile.a, setter: playerIndex };
-+    state.turnMessage = `${actor} played a double and must cover it.`;
-+  } else if (state.pendingDouble && state.pendingDouble.trainIndex === trainIndex) {
-+    state.pendingDouble = null;
-+    state.turnMessage = `${actor} covered the double.`;
-+  } else if (isDouble(tile) && settings.doubleRule === 'extraTurn') {
-+    state.extraTurnPending = true;
-+    state.turnMessage = `${actor} played a double and earns another move.`;
-+  }
-+
-+  if (state.openingPhase && state.players.every((player) => player.hasStartedTrain)) {
-+    state.openingPhase = false;
-+    pushLog(state, 'All personal trains are started. Regular play is now open.');
-+    state.turnMessage = 'Opening phase complete. Regular play is now open.';
-+  }
-+
-+  return { ok: true, tile };
-+}
-+
-+export function scoreMove(state, settings, playerIndex, move) {
-+  const { tile, trainIndex } = move;
-+  const playerTrain = state.trains[playerIndex];
-+  const targetTrain = state.trains[trainIndex];
-+  let score = pipSum(tile) * (settings.difficulty === 'hard' ? 3 : 2);
-+
-+  if (state.pendingDouble) {
-+    score += settings.difficulty === 'hard' ? 150 : 100;
-+  }
-+  if (trainIndex === playerIndex) {
-+    score += settings.difficulty === 'hard' ? 16 : 12;
-+    if (playerTrain.open) {
-+      score += settings.difficulty === 'hard' ? 18 : 12;
-+    }
-+    if (state.openingPhase && !state.players[playerIndex].hasStartedTrain) {
-+      score += 40;
-+    }
-+  }
-+  if (targetTrain.isMexican) {
-+    score += settings.difficulty === 'easy' ? 2 : 5;
-+  }
-+  if (!targetTrain.isMexican && targetTrain.ownerIndex !== playerIndex) {
-+    score -= settings.difficulty === 'hard' ? 7 : 4;
-+    if (targetTrain.open) {
-+      score += 2;
-+    }
-+  }
-+  if (isDouble(tile)) {
-+    if (settings.doubleRule === 'cover') {
-+      score += canCoverAfterDouble(state, playerIndex, tile.id, trainIndex) ? (settings.difficulty === 'hard' ? 18 : 12) : -18;
-+    } else {
-+      score += 10;
-+    }
-+  }
-+  if (state.openingPhase && trainIndex !== playerIndex) {
-+    score -= 50;
-+  }
-+  const nextEndpoint = playableValueForTile(tile, targetTrain.endpoint);
-+  if (nextEndpoint !== null && nextEndpoint >= 9) {
-+    score += settings.difficulty === 'hard' ? 4 : 2;
-+  }
-+  return score;
-+}
-+
-+export function chooseBotMove(state, settings, playerIndex) {
-+  const legalMoves = getAllLegalMoves(state, playerIndex);
-+  if (legalMoves.length === 0) {
-+    return null;
-+  }
-+  const difficulty = DIFFICULTY_SETTINGS[settings.difficulty];
-+  if (difficulty.chooser === 'random') {
-+    return legalMoves[Math.floor(Math.random() * legalMoves.length)];
-+  }
-+  const scored = legalMoves
-+    .map((move) => ({ move, score: scoreMove(state, settings, playerIndex, move) }))
-+    .sort((left, right) => right.score - left.score);
-+
-+  if (difficulty.chooser === 'top-three') {
-+    const shortlist = scored.slice(0, Math.min(3, scored.length));
-+    return shortlist[Math.floor(Math.random() * shortlist.length)].move;
-+  }
-+  return scored[0].move;
-+}
-+
-+export function drawForCurrentPlayer(state) {
-+  if (state.boneyard.length === 0) {
-+    return null;
-+  }
-+  const tile = state.boneyard.pop();
-+  state.players[state.currentPlayer].hand.push(tile);
-+  pushLog(state, `${state.players[state.currentPlayer].name} drew ${tileLabel(tile)}.`);
-+  return tile;
-+}
-+
-+export function handleUnableToPlay(state, playerIndex) {
-+  markTrainOpen(state, playerIndex, true);
-+  const player = state.players[playerIndex];
-+  if (state.openingPhase && !player.hasStartedTrain) {
-+    state.turnMessage = `${player.name} could not start their train and opened it.`;
-+    pushLog(state, `${player.name} could not start their train and opened it.`);
-+    return;
-+  }
-+  if (state.pendingDouble) {
-+    state.turnMessage = `${player.name} could not cover the double. Their train is now open.`;
-+    pushLog(state, `${player.name} could not cover the double and opened their train.`);
-+    return;
-+  }
-+  state.turnMessage = `${player.name} could not play and opened their train.`;
-+  pushLog(state, `${player.name} could not play and opened their train.`);
-+}
-+
-+export function finalizeScores(state, match) {
-+  const roundScores = state.players.map((player) => summarizeHand(player.hand));
-+  roundScores.forEach((score, index) => {
-+    match.scores[index] += score;
-+  });
-+  return roundScores;
-+}
-+
-+export function getMatchLeaderIndex(match) {
-+  return match.scores
-+    .map((score, index) => ({ score, index, roundsWon: match.roundsWon[index] }))
-+    .sort((left, right) => left.score - right.score || right.roundsWon - left.roundsWon)[0].index;
-+}
-+
-+export function canAnyPlayerMove(state) {
-+  return state.players.some((_, index) => getPlayableTiles(state, index).length > 0);
-+}
-*** End Patch
+  if (!train.isMexican && train.ownerIndex === playerIndex) {
+    train.open = false;
+    state.players[playerIndex].hasStartedTrain = true;
+  }
+
+  const actor = state.players[playerIndex].name;
+  pushLog(state, `${actor} played ${tileLabel(tile)} on ${train.name}.`);
+
+  if (isDouble(tile) && settings.doubleRule === 'cover') {
+    state.pendingDouble = { trainIndex, value: tile.a, setter: playerIndex };
+    state.turnMessage = `${actor} played a double and must cover it.`;
+  } else if (state.pendingDouble && state.pendingDouble.trainIndex === trainIndex) {
+    state.pendingDouble = null;
+    state.turnMessage = `${actor} covered the double.`;
+  } else if (isDouble(tile) && settings.doubleRule === 'extraTurn') {
+    state.extraTurnPending = true;
+    state.turnMessage = `${actor} played a double and earns another move.`;
+  }
+
+  if (state.openingPhase && state.players.every((player) => player.hasStartedTrain)) {
+    state.openingPhase = false;
+    pushLog(state, 'All personal trains are started. Regular play is now open.');
+    state.turnMessage = 'Opening phase complete. Regular play is now open.';
+  }
+
+  return { ok: true, tile };
+}
+
+export function scoreMove(state, settings, playerIndex, move) {
+  const { tile, trainIndex } = move;
+  const playerTrain = state.trains[playerIndex];
+  const targetTrain = state.trains[trainIndex];
+  let score = pipSum(tile) * (settings.difficulty === 'hard' ? 3 : 2);
+
+  if (state.pendingDouble) {
+    score += settings.difficulty === 'hard' ? 150 : 100;
+  }
+  if (trainIndex === playerIndex) {
+    score += settings.difficulty === 'hard' ? 16 : 12;
+    if (playerTrain.open) {
+      score += settings.difficulty === 'hard' ? 18 : 12;
+    }
+    if (state.openingPhase && !state.players[playerIndex].hasStartedTrain) {
+      score += 40;
+    }
+  }
+  if (targetTrain.isMexican) {
+    score += settings.difficulty === 'easy' ? 2 : 5;
+  }
+  if (!targetTrain.isMexican && targetTrain.ownerIndex !== playerIndex) {
+    score -= settings.difficulty === 'hard' ? 7 : 4;
+    if (targetTrain.open) {
+      score += 2;
+    }
+  }
+  if (isDouble(tile)) {
+    if (settings.doubleRule === 'cover') {
+      score += canCoverAfterDouble(state, playerIndex, tile.id, trainIndex) ? (settings.difficulty === 'hard' ? 18 : 12) : -18;
+    } else {
+      score += 10;
+    }
+  }
+  if (state.openingPhase && trainIndex !== playerIndex) {
+    score -= 50;
+  }
+  const nextEndpoint = playableValueForTile(tile, targetTrain.endpoint);
+  if (nextEndpoint !== null && nextEndpoint >= 9) {
+    score += settings.difficulty === 'hard' ? 4 : 2;
+  }
+  return score;
+}
+
+export function chooseBotMove(state, settings, playerIndex) {
+  const legalMoves = getAllLegalMoves(state, playerIndex);
+  if (legalMoves.length === 0) {
+    return null;
+  }
+  const difficulty = DIFFICULTY_SETTINGS[settings.difficulty];
+  if (difficulty.chooser === 'random') {
+    return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+  }
+  const scored = legalMoves
+    .map((move) => ({ move, score: scoreMove(state, settings, playerIndex, move) }))
+    .sort((left, right) => right.score - left.score);
+
+  if (difficulty.chooser === 'top-three') {
+    const shortlist = scored.slice(0, Math.min(3, scored.length));
+    return shortlist[Math.floor(Math.random() * shortlist.length)].move;
+  }
+  return scored[0].move;
+}
+
+export function drawForCurrentPlayer(state) {
+  if (state.boneyard.length === 0) {
+    return null;
+  }
+  const tile = state.boneyard.pop();
+  state.players[state.currentPlayer].hand.push(tile);
+  pushLog(state, `${state.players[state.currentPlayer].name} drew ${tileLabel(tile)}.`);
+  return tile;
+}
+
+export function handleUnableToPlay(state, playerIndex) {
+  markTrainOpen(state, playerIndex, true);
+  const player = state.players[playerIndex];
+  if (state.openingPhase && !player.hasStartedTrain) {
+    state.turnMessage = `${player.name} could not start their train and opened it.`;
+    pushLog(state, `${player.name} could not start their train and opened it.`);
+    return;
+  }
+  if (state.pendingDouble) {
+    state.turnMessage = `${player.name} could not cover the double. Their train is now open.`;
+    pushLog(state, `${player.name} could not cover the double and opened their train.`);
+    return;
+  }
+  state.turnMessage = `${player.name} could not play and opened their train.`;
+  pushLog(state, `${player.name} could not play and opened their train.`);
+}
+
+export function finalizeScores(state, match) {
+  const roundScores = state.players.map((player) => summarizeHand(player.hand));
+  roundScores.forEach((score, index) => {
+    match.scores[index] += score;
+  });
+  return roundScores;
+}
+
+export function getMatchLeaderIndex(match) {
+  return match.scores
+    .map((score, index) => ({ score, index, roundsWon: match.roundsWon[index] }))
+    .sort((left, right) => left.score - right.score || right.roundsWon - left.roundsWon)[0].index;
+}
+
+export function canAnyPlayerMove(state) {
+  return state.players.some((_, index) => getPlayableTiles(state, index).length > 0);
+}

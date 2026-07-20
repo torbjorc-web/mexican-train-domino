@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mexican Train Tests</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #f2e7d4;
+        color: #1f2430;
+        font-family: Georgia, "Times New Roman", serif;
+      }
+
+      .panel {
+        max-width: 900px;
+        margin: 0 auto;
+        background: #f8f1e4;
+        border: 2px solid #b14a2d55;
+        padding: 24px 28px;
+      }
+
+      h1 {
+        margin-top: 0;
+      }
+
+      .pass {
+        color: #21593f;
+      }
+
+      .fail {
+        color: #972d21;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <h1>Mexican Train Browser Tests</h1>
+      <p>These tests run directly in the browser with the same ES modules used by the game.</p>
+      <div id="results">Running tests...</div>
+    </div>
+    <script type="module">
+      import { runGameStateTests } from './gameState.spec.js';
+
+      const resultsElement = document.getElementById('results');
+
+      try {
+        const results = runGameStateTests();
+        resultsElement.innerHTML = `
+          <p class="pass"><strong>${results.length} tests passed.</strong></p>
+          <ul>${results.map((message) => `<li class="pass">${message}</li>`).join('')}</ul>
+        `;
+      } catch (error) {
+        resultsElement.innerHTML = `<p class="fail"><strong>Test run failed:</strong>\n${error.stack || error.message}</p>`;
+      }
+    </script>
+  </body>
+</html>
