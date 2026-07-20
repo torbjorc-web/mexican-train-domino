@@ -80,23 +80,24 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.trainColorHeader = this.add.text(1105, 190, 'Train Colors', {
+    this.ui.trainColorHeader = this.add.text(1095, 190, 'Train Colors', {
       fontFamily: 'Georgia',
       fontSize: '20px',
       color: UI_COLORS.ink,
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5);
 
-    this.ui.trainColorSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createTrainColorSelector(this, 232 + (index * 44), index));
+    this.ui.trainColorSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createTrainColorSelector(this, 296 + (index * 44), index));
 
-    this.ui.playerNameHeader = this.add.text(1105, 430, 'Player Names', {
+    this.ui.playerNameHeader = this.add.text(1095, 430, 'Player Names', {
       fontFamily: 'Georgia',
       fontSize: '20px',
       color: UI_COLORS.ink,
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5);
+    this.ui.playerNameHeader.setVisible(false);
 
-    this.ui.playerNameSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createPlayerNameSelector(this, 472 + (index * 42), index));
+    this.ui.playerNameSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createPlayerNameSelector(this, 296 + (index * 44), index));
 
     this.ui.highScoreHeader = this.add.text(1105, 628, 'High Scores', {
       fontFamily: 'Georgia',

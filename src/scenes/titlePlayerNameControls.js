@@ -12,25 +12,20 @@ function promptForName(scene, index) {
 }
 
 export function createPlayerNameSelector(scene, y, index) {
-  const label = scene.add.text(1015, y, `Player ${index + 1}`, {
-    fontFamily: 'Georgia',
-    fontSize: '16px',
-    color: UI_COLORS.ink,
-    fontStyle: 'bold',
-  }).setOrigin(1, 0.5);
-  const valueBox = scene.add.rectangle(1165, y, 170, 30, UI_COLORS.playable)
+  const container = scene.add.container(1120, y);
+  const valueBox = scene.add.rectangle(60, 0, 124, 30, UI_COLORS.playable)
     .setStrokeStyle(2, UI_COLORS.accentAlt, 1)
     .setInteractive({ useHandCursor: true });
-  const valueText = scene.add.text(1165, y, '', {
+  const valueText = scene.add.text(60, 0, '', {
     fontFamily: 'Georgia',
-    fontSize: '15px',
+    fontSize: '13px',
     color: UI_COLORS.ink,
     fontStyle: 'bold',
   }).setOrigin(0.5, 0.5).setInteractive({ useHandCursor: true });
-  const editButton = scene.add.rectangle(1270, y, 34, 30, UI_COLORS.panelDark)
+  const editButton = scene.add.rectangle(142, 0, 34, 30, UI_COLORS.panelDark)
     .setStrokeStyle(2, UI_COLORS.accent, 1)
     .setInteractive({ useHandCursor: true });
-  const editText = scene.add.text(1270, y, 'Edit', {
+  const editText = scene.add.text(142, 0, 'Edit', {
     fontFamily: 'Georgia',
     fontSize: '12px',
     color: UI_COLORS.ink,
@@ -43,19 +38,17 @@ export function createPlayerNameSelector(scene, y, index) {
   editButton.on('pointerup', onEdit);
   editText.on('pointerup', onEdit);
 
-  return { label, valueBox, valueText, editButton, editText };
+  container.add([valueBox, valueText, editButton, editText]);
+
+  return { container, valueBox, valueText, editButton, editText };
 }
 
 export function refreshPlayerNameSelectors(scene) {
   scene.settings.humanPlayerNames = normalizeHumanPlayerNames(scene.settings.humanPlayerNames, scene.settings.humanPlayers);
-  scene.ui.playerNameHeader.setVisible(scene.settings.humanPlayers > 0);
+  scene.ui.playerNameHeader.setVisible(false);
   scene.ui.playerNameSelectors.forEach((selector, index) => {
     const visible = index < scene.settings.humanPlayers;
-    selector.label.setVisible(visible);
-    selector.valueBox.setVisible(visible);
-    selector.valueText.setVisible(visible);
-    selector.editButton.setVisible(visible);
-    selector.editText.setVisible(visible);
+    selector.container.setVisible(visible);
     if (visible) {
       selector.valueText.setText(scene.settings.humanPlayerNames[index]);
     }

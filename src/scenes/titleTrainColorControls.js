@@ -6,7 +6,7 @@ import {
 import { UI_COLORS } from '../config/gameConfig.js';
 
 export function createTrainColorSelector(scene, y, index) {
-  const container = scene.add.container(1020, y);
+  const container = scene.add.container(900, y);
   const label = scene.add.text(-92, 0, `Player ${index + 1}`, {
     fontFamily: 'Georgia',
     fontSize: '15px',
