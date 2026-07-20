@@ -691,7 +691,22 @@ export class MexicanTrainScene extends Phaser.Scene {
     }
 
     if (this.getPlayableTiles(playerIndex).length > 0) {
-      this.state.turnMessage = 'You still have a legal play available.';
+      const legalTiles = this.getPlayableTiles(playerIndex);
+      if (!this.getSelectedTile() && legalTiles.length > 0) {
+        this.selectedTileId = legalTiles[0].id;
+        this.state.turnMessage = 'You have a legal play. A playable tile is selected; click a train endpoint.';
+        this.render();
+        return;
+      }
+
+      const selectedTile = this.getSelectedTile();
+      const targets = selectedTile ? this.getPlayableTargets(playerIndex, selectedTile) : [];
+      if (targets.length === 1) {
+        this.tryHumanMove(targets[0].trainIndex);
+        return;
+      }
+
+      this.state.turnMessage = 'You still have a legal play available. Click a highlighted train endpoint.';
       this.render();
       return;
     }
