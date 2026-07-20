@@ -1,0 +1,21 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #f2e7d4;
+  color: #1f2430;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+body {
+  min-height: 100vh;
+}
+
+#game-root {
+  width: 100vw;
+  height: 100vh;
+}
+
+canvas {
+  display: block;
+}
