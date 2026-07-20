@@ -54,11 +54,12 @@ export function getHandSize(totalPlayers) {
   return totalPlayers <= 4 ? 15 : 12;
 }
 
-export function makeTrain(name, ownerIndex, isMexican, engineValue) {
+export function makeTrain(name, ownerIndex, isMexican, engineValue, colorKey = null) {
   return {
     name,
     ownerIndex,
     isMexican,
+    colorKey,
     open: isMexican,
     tiles: [],
     endpoint: engineValue,

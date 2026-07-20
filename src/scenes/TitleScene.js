@@ -6,7 +6,10 @@ import {
   MIN_PLAYERS,
   UI_COLORS,
 } from '../config/gameConfig.js';
+import { getTrainColorLabel } from '../config/trainColors.js';
+import { normalizeSettings } from '../state/gameState.js';
 import { clamp } from '../utils/dominoes.js';
+import { createTrainColorSelector, refreshTrainColorSelectors } from './titleTrainColorControls.js';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -16,18 +19,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   init(data) {
-    this.settings = {
-      ...DEFAULT_SETTINGS,
-      ...(data?.settings || {}),
-    };
-    this.settings.totalPlayers = clamp(this.settings.totalPlayers, MIN_PLAYERS, MAX_PLAYERS);
-    this.settings.humanPlayers = clamp(this.settings.humanPlayers, 1, this.settings.totalPlayers);
-    if (!DIFFICULTY_SETTINGS[this.settings.difficulty]) {
-      this.settings.difficulty = DEFAULT_SETTINGS.difficulty;
-    }
-    if (!DOUBLE_RULE_SETTINGS[this.settings.doubleRule]) {
-      this.settings.doubleRule = DEFAULT_SETTINGS.doubleRule;
-    }
+    this.settings = normalizeSettings({ ...DEFAULT_SETTINGS, ...(data?.settings || {}) });
   }
 
   create() {
@@ -87,7 +79,16 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.summary = this.add.text(1010, 455, '', {
+    this.ui.trainColorHeader = this.add.text(1010, 190, 'Train Colors', {
+      fontFamily: 'Georgia',
+      fontSize: '20px',
+      color: UI_COLORS.ink,
+      fontStyle: 'bold',
+    }).setOrigin(0.5, 0.5);
+
+    this.ui.trainColorSelectors = Array.from({ length: MAX_PLAYERS }, (_, index) => createTrainColorSelector(this, 230 + (index * 34), index));
+
+    this.ui.summary = this.add.text(1010, 470, '', {
       fontFamily: 'Georgia',
       fontSize: '16px',
       color: UI_COLORS.ink,
@@ -163,12 +164,15 @@ export class TitleScene extends Phaser.Scene {
     this.ui.difficulty.valueText.setText(this.ui.difficulty.getValue());
     this.ui.strictOpening.valueText.setText(this.ui.strictOpening.getValue());
     this.ui.doubleRule.valueText.setText(this.ui.doubleRule.getValue());
+    refreshTrainColorSelectors(this);
+
     const botCount = this.settings.totalPlayers - this.settings.humanPlayers;
     this.ui.summary.setText([
       `${this.settings.humanPlayers} human ${this.settings.humanPlayers === 1 ? 'player' : 'players'} and ${botCount} ${botCount === 1 ? 'bot' : 'bots'}.`,
       `Opening rule: ${this.settings.strictOpening ? 'everyone starts their own train first' : 'free opening on any eligible train'}.`,
       `Double rule: ${DOUBLE_RULE_SETTINGS[this.settings.doubleRule].label.toLowerCase()}.`,
       `Bots use the ${DIFFICULTY_SETTINGS[this.settings.difficulty].label.toLowerCase()} heuristic set.`,
+      `Train colors: ${this.settings.humanTrainColors.slice(0, this.settings.humanPlayers).map((colorKey, index) => `P${index + 1} ${getTrainColorLabel(colorKey)}`).join(', ')}.`,
     ].join('\n'));
   }
 }

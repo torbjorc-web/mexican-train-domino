@@ -6,10 +6,7 @@ import {
   MIN_PLAYERS,
   UI_COLORS,
 } from '../config/gameConfig.js';
-import {
-  clamp,
-  isDouble,
-} from '../utils/dominoes.js';
+import { isDouble } from '../utils/dominoes.js';
 import {
   canAnyPlayerMove,
   canPlayOnTrain,
@@ -34,6 +31,7 @@ import {
   renderScoreboard,
   renderStatus,
 } from '../render/gameSceneRenderers.js';
+import { renderTrainStation } from '../render/trainStationRenderer.js';
 
 export class MexicanTrainScene extends Phaser.Scene {
   constructor() {
@@ -136,7 +134,21 @@ export class MexicanTrainScene extends Phaser.Scene {
       wordWrap: { width: 720 },
     }).setOrigin(0.5, 0);
 
+    this.ui.trainStationTitle = this.add.text(1025, 74, 'Train Station', {
+      fontFamily: 'Georgia',
+      fontSize: '24px',
+      color: UI_COLORS.ink,
+      fontStyle: 'bold',
+    }).setOrigin(0.5, 0.5);
+    this.ui.trainStationHint = this.add.text(1025, 98, 'Unique colors help track each train.', {
+      fontFamily: 'Georgia',
+      fontSize: '13px',
+      color: UI_COLORS.ink,
+      align: 'center',
+    }).setOrigin(0.5, 0.5);
+
     this.ui.boardGroup = this.add.group();
+    this.ui.trainStationGroup = this.add.group();
     this.ui.handGroup = this.add.group();
 
     this.ui.handTitle = this.add.text(340, 585, '', {
@@ -151,10 +163,10 @@ export class MexicanTrainScene extends Phaser.Scene {
       color: UI_COLORS.ink,
     });
 
-    this.ui.drawButton = this.add.rectangle(1040, 628, 160, 56, UI_COLORS.accentAlt)
+    this.ui.drawButton = this.add.rectangle(1040, 590, 160, 56, UI_COLORS.accentAlt)
       .setStrokeStyle(2, 0x2f4e3b, 1)
       .setInteractive({ useHandCursor: true });
-    this.ui.drawLabel = this.add.text(1040, 628, 'Draw / Pass', {
+    this.ui.drawLabel = this.add.text(1040, 590, 'Draw / Pass', {
       fontFamily: 'Georgia',
       fontSize: '20px',
       color: '#ffffff',
@@ -163,10 +175,10 @@ export class MexicanTrainScene extends Phaser.Scene {
     this.ui.drawButton.on('pointerup', () => this.onDrawOrPass());
     this.ui.drawLabel.setInteractive({ useHandCursor: true }).on('pointerup', () => this.onDrawOrPass());
 
-    this.ui.advanceButton = this.add.rectangle(1210, 628, 120, 56, UI_COLORS.accent)
+    this.ui.advanceButton = this.add.rectangle(1210, 590, 120, 56, UI_COLORS.accent)
       .setStrokeStyle(2, 0x7c2914, 1)
       .setInteractive({ useHandCursor: true });
-    this.ui.advanceLabel = this.add.text(1210, 628, 'Next', {
+    this.ui.advanceLabel = this.add.text(1210, 590, 'Next', {
       fontFamily: 'Georgia',
       fontSize: '20px',
       color: '#ffffff',
@@ -697,6 +709,8 @@ export class MexicanTrainScene extends Phaser.Scene {
 
   renderBoard() { renderBoard(this); }
 
+  renderTrainStation() { renderTrainStation(this); }
+
   renderHand() { renderHand(this); }
 
   renderScoreboard() { renderScoreboard(this); }
@@ -713,6 +727,7 @@ export class MexicanTrainScene extends Phaser.Scene {
     this.renderScoreboard();
     this.renderPlayerSummary();
     this.renderBoard();
+    this.renderTrainStation();
     this.renderHand();
   }
 }

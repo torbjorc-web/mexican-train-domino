@@ -70,5 +70,19 @@ export function runGameStateTests() {
   assert(botMoves.length > 0, 'A fresh round should usually give the next player at least one legal opening move');
   results.push('legal move generation returns playable moves for bot turns');
 
+  const colorSettings = normalizeSettings({
+    totalPlayers: 5,
+    humanPlayers: 3,
+    strictOpening: false,
+    doubleRule: 'cover',
+    humanTrainColors: ['gold', 'gold', 'bogus'],
+  });
+  const colorMatch = createMatchState(colorSettings);
+  const colorRound = createRoundState(colorMatch, colorSettings);
+  const assignedColors = colorRound.players.map((player) => player.colorKey);
+  assert(new Set(assignedColors).size === assignedColors.length, 'Every train should receive a unique color');
+  assert(colorRound.players.slice(0, 3).every((player) => Boolean(player.colorKey)), 'Human players should have explicit train colors');
+  results.push('train color assignment keeps every train unique');
+
   return results;
 }

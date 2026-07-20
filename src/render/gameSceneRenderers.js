@@ -4,6 +4,7 @@ import {
   TOTAL_ROUNDS,
   UI_COLORS,
 } from '../config/gameConfig.js';
+import { getTrainColorLabel, getTrainColorStyle } from '../config/trainColors.js';
 import { createDominoSprite } from './createDominoSprite.js';
 import { getTrainAnchors, isDouble, pipSum } from '../utils/dominoes.js';
 
@@ -23,6 +24,7 @@ export function renderBoard(scene) {
 
   trainAnchors.forEach((anchor, trainIndex) => {
     const train = scene.state.trains[trainIndex];
+    const trainColor = getTrainColorStyle(train.colorKey);
     const dx = anchor.x - center.x;
     const dy = anchor.y - center.y;
     const distance = Math.sqrt((dx * dx) + (dy * dy));
@@ -30,15 +32,18 @@ export function renderBoard(scene) {
     const uy = dy / distance;
     const selectedTile = scene.getSelectedTile();
     const enabled = scene.canHumanAct() && selectedTile && scene.canPlayOnTrain(scene.state.currentPlayer, trainIndex, selectedTile);
-    const lineColor = enabled ? UI_COLORS.selected : (train.open || train.isMexican ? UI_COLORS.open : UI_COLORS.closed);
-    const rail = scene.add.line(0, 0, center.x, center.y, anchor.x, anchor.y, lineColor, 0.42).setLineWidth(5, 5);
-    const endpoint = scene.add.circle(anchor.x, anchor.y, 28, enabled ? 0xfff5db : 0xffffff).setStrokeStyle(3, lineColor, 1);
+    const lineColor = enabled ? UI_COLORS.selected : trainColor.stroke;
+    const rail = scene.add.line(0, 0, center.x, center.y, anchor.x, anchor.y, lineColor, train.isMexican ? 0.5 : (train.open ? 0.44 : 0.34)).setLineWidth(5, 5);
+    const endpoint = scene.add.circle(anchor.x, anchor.y, 28, enabled ? 0xfff5db : trainColor.fill).setStrokeStyle(3, trainColor.stroke, 1);
     endpoint.setInteractive({ useHandCursor: true });
     endpoint.on('pointerup', () => scene.onTrainButton(trainIndex));
     const zone = scene.add.zone(anchor.x - 50, anchor.y - 34, 100, 68).setOrigin(0, 0).setRectangleDropZone(100, 68);
     zone.setData('trainIndex', trainIndex);
 
     const labelLines = [train.name, `End ${train.endpoint} | ${train.isMexican ? 'public' : (train.open ? 'open' : 'closed')}`];
+    if (train.colorKey) {
+      labelLines.push(getTrainColorLabel(train.colorKey));
+    }
     if (scene.state.openingPhase && !train.isMexican && !scene.state.players[train.ownerIndex].hasStartedTrain) {
       labelLines.push('not started');
     }
@@ -145,7 +150,7 @@ export function renderPlayerSummary(scene) {
     const shortName = player.name.replace('Player ', 'P').replace('Bot ', 'B');
     const openFlag = train.open ? 'O' : 'C';
     const startFlag = player.hasStartedTrain ? 'S' : 'N';
-    lines.push(`${shortName}: hand ${player.hand.length}, end ${train.endpoint}, ${openFlag}, ${startFlag}`);
+    lines.push(`${shortName}: hand ${player.hand.length}, end ${train.endpoint}, ${openFlag}, ${startFlag}, ${getTrainColorLabel(train.colorKey)}`);
   });
   lines.push(`Mexican: end ${scene.state.trains[scene.getMexicanTrainIndex()].endpoint}`);
   lines.push(`Yard: ${scene.state.boneyard.length}`);

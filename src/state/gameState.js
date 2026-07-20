@@ -7,6 +7,11 @@ import {
   MIN_PLAYERS,
 } from '../config/gameConfig.js';
 import {
+  MEXICAN_TRAIN_COLOR,
+  TRAIN_COLOR_OPTIONS,
+  normalizeHumanTrainColors,
+} from '../config/trainColors.js';
+import {
   clamp,
   cloneTile,
   createDominoSet,
@@ -27,6 +32,7 @@ export function normalizeSettings(settings) {
   };
   next.totalPlayers = clamp(next.totalPlayers, MIN_PLAYERS, MAX_PLAYERS);
   next.humanPlayers = clamp(next.humanPlayers, 1, next.totalPlayers);
+  next.humanTrainColors = normalizeHumanTrainColors(next.humanTrainColors, next.humanPlayers);
   if (!DIFFICULTY_SETTINGS[next.difficulty]) {
     next.difficulty = DEFAULT_SETTINGS.difficulty;
   }
@@ -34,6 +40,20 @@ export function normalizeSettings(settings) {
     next.doubleRule = DEFAULT_SETTINGS.doubleRule;
   }
   return next;
+}
+
+function buildPlayerColorKeys(settings) {
+  const humanColorKeys = normalizeHumanTrainColors(settings.humanTrainColors, settings.humanPlayers);
+  const used = new Set(humanColorKeys);
+  const remainingColorKeys = TRAIN_COLOR_OPTIONS
+    .map((option) => option.key)
+    .filter((colorKey) => !used.has(colorKey));
+
+  return Array.from({ length: settings.totalPlayers }, (_, index) => (
+    index < settings.humanPlayers
+      ? humanColorKeys[index]
+      : remainingColorKeys[index - settings.humanPlayers]
+  ));
 }
 
 export function createMatchState(settings) {
@@ -50,12 +70,14 @@ export function createRoundState(match, settings) {
   const engineValue = MAX_PIP - match.roundIndex;
   const totalPlayers = settings.totalPlayers;
   const handSize = getHandSize(totalPlayers);
+  const playerColorKeys = buildPlayerColorKeys(settings);
   const deck = shuffle(createDominoSet().filter((tile) => !(tile.a === engineValue && tile.b === engineValue)));
   const players = Array.from({ length: totalPlayers }, (_, index) => ({
     name: index < settings.humanPlayers ? `Player ${index + 1}` : `Bot ${index - settings.humanPlayers + 1}`,
     hand: [],
     isHuman: index < settings.humanPlayers,
     hasStartedTrain: false,
+    colorKey: playerColorKeys[index],
   }));
 
   for (let handIndex = 0; handIndex < handSize; handIndex += 1) {
@@ -64,8 +86,8 @@ export function createRoundState(match, settings) {
     }
   }
 
-  const trains = players.map((player, index) => makeTrain(`${player.name} Train`, index, false, engineValue));
-  trains.push(makeTrain('Mexican Train', null, true, engineValue));
+  const trains = players.map((player, index) => makeTrain(`${player.name} Train`, index, false, engineValue, player.colorKey));
+  trains.push(makeTrain('Mexican Train', null, true, engineValue, MEXICAN_TRAIN_COLOR.key));
 
   return {
     engineValue,
