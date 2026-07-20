@@ -51,11 +51,24 @@ export function renderBoard(scene) {
     const enabled = scene.canHumanAct() && selectedTile && scene.canPlayOnTrain(scene.state.currentPlayer, trainIndex, selectedTile);
     const lineColor = enabled ? UI_COLORS.selected : trainColor.stroke;
     const rail = scene.add.line(0, 0, center.x, center.y, anchor.x, anchor.y, lineColor, train.isMexican ? 0.5 : (train.open ? 0.44 : 0.34)).setLineWidth(5, 5);
-    const endpoint = scene.add.circle(anchor.x, anchor.y, 28, enabled ? 0xfff5db : trainColor.fill).setStrokeStyle(3, trainColor.stroke, 1);
+    const endpointRadius = train.isMexican ? 34 : 28;
+    const endpoint = scene.add.circle(anchor.x, anchor.y, endpointRadius, enabled ? 0xfff5db : trainColor.fill).setStrokeStyle(3, trainColor.stroke, 1);
     endpoint.setInteractive({ useHandCursor: true });
+    endpoint.setDepth(20);
     endpoint.on('pointerup', () => scene.onTrainButton(trainIndex));
-    const zone = scene.add.zone(anchor.x - 50, anchor.y - 34, 100, 68).setOrigin(0, 0).setRectangleDropZone(100, 68);
+    const zoneWidth = train.isMexican ? 140 : 100;
+    const zoneHeight = train.isMexican ? 94 : 68;
+    const zone = scene.add.zone(anchor.x - (zoneWidth / 2), anchor.y - (zoneHeight / 2), zoneWidth, zoneHeight)
+      .setOrigin(0, 0)
+      .setRectangleDropZone(zoneWidth, zoneHeight);
     zone.setData('trainIndex', trainIndex);
+
+    if (train.isMexican) {
+      const hotspotRing = scene.add.circle(anchor.x, anchor.y, endpointRadius + 10, trainColor.stroke, enabled ? 0.2 : 0.1)
+        .setStrokeStyle(2, trainColor.stroke, 0.55)
+        .setDepth(19);
+      scene.ui.boardGroup.add(hotspotRing);
+    }
 
     const labelLines = [train.name, `End ${train.endpoint} | ${train.isMexican ? 'public' : (train.open ? 'open' : 'closed')}`];
     labelLines.push(getTrainColorLabel(resolveTrainColorKey(scene, train, trainIndex)));
@@ -76,10 +89,11 @@ export function renderBoard(scene) {
 
     scene.ui.boardGroup.addMultiple([rail, endpoint, zone, label]);
 
-    const visibleTiles = train.tiles.slice(-4);
-    const startDistance = Math.max(110, distance - ((visibleTiles.length - 1) * 72) - 48);
+    const visibleTiles = train.tiles.slice(train.isMexican ? -3 : -4);
+    const tileStride = train.isMexican ? 62 : 72;
+    const startDistance = Math.max(110, distance - ((visibleTiles.length - 1) * tileStride) - 48);
     visibleTiles.forEach((tile, tileIndex) => {
-      const offset = startDistance + (tileIndex * 72);
+      const offset = startDistance + (tileIndex * tileStride);
       const tileSprite = createDominoSprite(scene, tile, center.x + (ux * offset), center.y + (uy * offset), {
         vertical: Math.abs(uy) > Math.abs(ux) || isDouble(tile),
         faceUp: true,
