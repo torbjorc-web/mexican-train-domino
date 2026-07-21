@@ -10,34 +10,56 @@ function safeJsonParse(payload) {
   }
 }
 
+function mapToParticipants(participantsMap) {
+  return Array.from(participantsMap.values())
+    .sort((left, right) => left.joinOrder - right.joinOrder)
+    .map(({ clientId, name, role }) => ({ clientId, name, role }));
+}
+
 export function createOnlineSession(options) {
   const {
     host,
     room,
     playerName,
     isHost,
+    maxPlayers = 6,
     onStatus,
     onSnapshot,
     onRemoteAction,
     onConnectionState,
+    onSeats,
   } = options;
 
   const session = {
     socket: null,
     clientId: createClientId(),
-    remoteClientId: null,
-    ready: false,
     closed: false,
     snapshotTimer: null,
     reconnectAttempts: 0,
     reconnectTimer: null,
     connected: false,
+    ready: false,
     suppressNextCloseReconnect: false,
+    joinCounter: 0,
+    participants: new Map(),
+    seats: [],
   };
 
   const emitStatus = (message) => {
     if (typeof onStatus === 'function') {
       onStatus(message);
+    }
+  };
+
+  const emitConnectionState = (state, details = {}) => {
+    if (typeof onConnectionState === 'function') {
+      onConnectionState({ state, ...details });
+    }
+  };
+
+  const emitSeats = () => {
+    if (typeof onSeats === 'function') {
+      onSeats(session.seats);
     }
   };
 
@@ -55,15 +77,9 @@ export function createOnlineSession(options) {
     try {
       session.socket.close();
     } catch {
-      // Ignore close errors during reconnect cleanup.
+      // Ignore socket close errors during reconnect cleanup.
     }
     session.socket = null;
-  };
-
-  const emitConnectionState = (state, details = {}) => {
-    if (typeof onConnectionState === 'function') {
-      onConnectionState({ state, ...details });
-    }
   };
 
   const clearReconnectTimer = () => {
@@ -71,6 +87,65 @@ export function createOnlineSession(options) {
       window.clearTimeout(session.reconnectTimer);
       session.reconnectTimer = null;
     }
+  };
+
+  const clearSnapshotTimer = () => {
+    if (session.snapshotTimer) {
+      window.clearTimeout(session.snapshotTimer);
+      session.snapshotTimer = null;
+    }
+  };
+
+  const updateReady = () => {
+    const mySeat = session.seats.find((entry) => entry.clientId === session.clientId);
+    session.ready = Boolean(mySeat);
+    if (session.ready) {
+      emitConnectionState('ready');
+    }
+  };
+
+  const setSeats = (seats) => {
+    session.seats = Array.isArray(seats) ? seats : [];
+    emitSeats();
+    updateReady();
+  };
+
+  const registerParticipant = (clientId, name, role) => {
+    const existing = session.participants.get(clientId);
+    const joinOrder = existing?.joinOrder ?? session.joinCounter;
+    if (!existing) {
+      session.joinCounter += 1;
+    }
+    session.participants.set(clientId, {
+      clientId,
+      name: `${name || 'Player'}`.trim() || 'Player',
+      role: role || 'guest',
+      joinOrder,
+    });
+  };
+
+  const buildSeatsFromParticipants = () => {
+    const ordered = mapToParticipants(session.participants).slice(0, Math.max(2, maxPlayers));
+    return ordered.map((participant, seatIndex) => ({
+      seatIndex,
+      clientId: participant.clientId,
+      name: participant.name,
+      role: participant.role,
+    }));
+  };
+
+  const publishSeats = () => {
+    if (!isHost) {
+      return;
+    }
+    const seats = buildSeatsFromParticipants();
+    setSeats(seats);
+    send({
+      type: 'seats',
+      seats,
+      maxPlayers,
+      clientId: session.clientId,
+    });
   };
 
   const scheduleReconnect = (reason) => {
@@ -91,6 +166,7 @@ export function createOnlineSession(options) {
   const connect = () => {
     const encodedRoom = encodeURIComponent(room || 'default-room');
     const url = `wss://${host}/parties/main/${encodedRoom}`;
+
     emitConnectionState('connecting', { url });
     session.socket = new WebSocket(url);
 
@@ -99,6 +175,15 @@ export function createOnlineSession(options) {
       session.connected = true;
       session.ready = false;
       session.reconnectAttempts = 0;
+      session.participants.clear();
+      session.joinCounter = 0;
+      session.seats = [];
+
+      registerParticipant(session.clientId, playerName, isHost ? 'host' : 'guest');
+      if (isHost) {
+        publishSeats();
+      }
+
       emitStatus(`Connected to room ${room}.`);
       emitConnectionState('connected');
       send({ type: 'hello', role: isHost ? 'host' : 'guest', name: playerName, clientId: session.clientId });
@@ -111,20 +196,21 @@ export function createOnlineSession(options) {
       }
 
       if (message.type === 'hello') {
-        session.remoteClientId = message.clientId;
-        session.ready = true;
-        emitStatus(`${message.name || 'Remote player'} joined the room.`);
-        emitConnectionState('ready');
+        registerParticipant(message.clientId, message.name, message.role || 'guest');
         if (isHost) {
-          send({ type: 'ready', clientId: session.clientId });
+          publishSeats();
+          emitStatus(`${message.name || 'Remote player'} joined the room.`);
         }
         return;
       }
 
-      if (message.type === 'ready') {
-        session.ready = true;
-        emitStatus('Both players are connected.');
-        emitConnectionState('ready');
+      if (message.type === 'seats' && !isHost) {
+        const seats = Array.isArray(message.seats) ? message.seats : [];
+        setSeats(seats);
+        const selfSeat = seats.find((entry) => entry.clientId === session.clientId);
+        if (selfSeat) {
+          emitStatus(`Assigned to seat ${selfSeat.seatIndex + 1}.`);
+        }
         return;
       }
 
@@ -134,7 +220,7 @@ export function createOnlineSession(options) {
       }
 
       if (message.type === 'action' && isHost && typeof onRemoteAction === 'function') {
-        onRemoteAction(message.action);
+        onRemoteAction(message.action, message.clientId || null);
       }
     });
 
@@ -164,9 +250,7 @@ export function createOnlineSession(options) {
     if (!isHost) {
       return;
     }
-    if (session.snapshotTimer) {
-      window.clearTimeout(session.snapshotTimer);
-    }
+    clearSnapshotTimer();
     session.snapshotTimer = window.setTimeout(() => {
       send({ type: 'snapshot', snapshot, clientId: session.clientId });
       session.snapshotTimer = null;
@@ -183,10 +267,7 @@ export function createOnlineSession(options) {
   const destroy = () => {
     session.closed = true;
     clearReconnectTimer();
-    if (session.snapshotTimer) {
-      window.clearTimeout(session.snapshotTimer);
-      session.snapshotTimer = null;
-    }
+    clearSnapshotTimer();
     closeSocket();
   };
 
@@ -195,7 +276,11 @@ export function createOnlineSession(options) {
       return;
     }
     emitStatus('Manual reconnect requested.');
-    emitConnectionState('reconnecting', { attempt: session.reconnectAttempts + 1, delayMs: 0, reason: 'manual' });
+    emitConnectionState('reconnecting', {
+      attempt: session.reconnectAttempts + 1,
+      delayMs: 0,
+      reason: 'manual',
+    });
     clearReconnectTimer();
     session.ready = false;
     session.connected = false;
@@ -212,5 +297,7 @@ export function createOnlineSession(options) {
     forceReconnect,
     isReady: () => session.ready,
     isConnected: () => session.connected,
+    getClientId: () => session.clientId,
+    getSeats: () => [...session.seats],
   };
 }

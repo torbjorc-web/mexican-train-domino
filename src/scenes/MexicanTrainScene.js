@@ -45,6 +45,9 @@ export class MexicanTrainScene extends Phaser.Scene {
     this.draggingTileId = null;
     this.ui = {};
     this.onlineSession = null;
+    this.onlineClientId = null;
+    this.localOnlineSeatIndex = null;
+    this.onlineSeats = [];
     this.onlineConnectionState = 'offline';
     this.onlineStateText = '';
     this.reconnectCooldownUntilMs = 0;
@@ -69,11 +72,9 @@ export class MexicanTrainScene extends Phaser.Scene {
 
     if (this.isOnlineMode()) {
       this.setupOnlineSession();
-      if (this.isOnlineHost()) {
-        this.startMatch();
-      } else {
-        this.ui.boardHint.setText('Connecting to online room. Waiting for host snapshot...');
-      }
+      this.ui.boardHint.setText(this.isOnlineHost()
+        ? `Waiting for players: 1/${this.settings.totalPlayers} connected.`
+        : 'Connecting to online room. Waiting for host snapshot...');
       return;
     }
 
@@ -349,11 +350,8 @@ export class MexicanTrainScene extends Phaser.Scene {
   }
 
   getLocalPlayerIndex() {
-    if (this.isOnlineHost()) {
-      return 0;
-    }
-    if (this.isOnlineGuest()) {
-      return 1;
+    if (this.isOnlineMode()) {
+      return Number.isInteger(this.localOnlineSeatIndex) ? this.localOnlineSeatIndex : -1;
     }
     return this.state?.currentPlayer ?? 0;
   }
@@ -395,6 +393,35 @@ export class MexicanTrainScene extends Phaser.Scene {
       }
     }
     return null;
+  }
+
+  updateOnlineSeats(seats) {
+    this.onlineSeats = Array.isArray(seats) ? seats : [];
+    const localSeat = this.onlineSeats.find((entry) => entry.clientId === this.onlineClientId);
+    this.localOnlineSeatIndex = localSeat ? localSeat.seatIndex : null;
+    this.applySeatNamesToState();
+  }
+
+  applySeatNamesToState() {
+    if (!this.state || !Array.isArray(this.onlineSeats)) {
+      return;
+    }
+    this.onlineSeats.forEach((seat) => {
+      if (!Number.isInteger(seat.seatIndex)) {
+        return;
+      }
+      if (!this.state.players[seat.seatIndex]) {
+        return;
+      }
+      if (seat.name && `${seat.name}`.trim()) {
+        this.state.players[seat.seatIndex].name = `${seat.name}`.trim();
+      }
+    });
+  }
+
+  getSeatForClientId(clientId) {
+    const seat = this.onlineSeats.find((entry) => entry.clientId === clientId);
+    return seat ? seat.seatIndex : null;
   }
 
   onReconnectButton() {
@@ -476,6 +503,7 @@ export class MexicanTrainScene extends Phaser.Scene {
       room: this.settings.onlineRoomCode,
       playerName: this.settings.onlinePlayerName,
       isHost: this.isOnlineHost(),
+      maxPlayers: this.settings.totalPlayers,
       onStatus: (message) => {
         if (this.state) {
           this.addLog(message);
@@ -487,7 +515,23 @@ export class MexicanTrainScene extends Phaser.Scene {
         }
       },
       onSnapshot: (snapshot) => this.applySnapshot(snapshot),
-      onRemoteAction: (action) => this.handleRemoteAction(action),
+      onRemoteAction: (action, senderClientId) => this.handleRemoteAction(action, senderClientId),
+      onSeats: (seats) => {
+        this.updateOnlineSeats(seats);
+        if (this.isOnlineHost()) {
+          const connected = seats.length;
+          if (!this.state) {
+            this.ui.boardHint.setText(`Waiting for players: ${connected}/${this.settings.totalPlayers} connected.`);
+            if (connected >= this.settings.totalPlayers) {
+              this.settings.humanPlayerNames = seats
+                .slice(0, this.settings.totalPlayers)
+                .map((seat, index) => (`${seat.name || `Player ${index + 1}`}`.trim() || `Player ${index + 1}`));
+              this.setOnlineBanner(`Online: ${connected} players connected. Starting match.`, 'ready');
+              this.startMatch();
+            }
+          }
+        }
+      },
       onConnectionState: ({ state, attempt, delayMs }) => {
         if (state === 'ready') {
           this.setOnlineBanner('Online: both players connected', 'ready');
@@ -515,6 +559,7 @@ export class MexicanTrainScene extends Phaser.Scene {
         }
       },
     });
+    this.onlineClientId = this.onlineSession.getClientId();
     this.onlineSession.connect();
   }
 
@@ -546,6 +591,7 @@ export class MexicanTrainScene extends Phaser.Scene {
     this.match = snapshot.match;
     this.state = snapshot.state;
     this.settings = normalizeSettings({ ...this.settings, ...(snapshot.settings || {}) });
+    this.applySeatNamesToState();
     this.selectedTileId = null;
     this.draggingTileId = null;
     this.render();
@@ -564,16 +610,19 @@ export class MexicanTrainScene extends Phaser.Scene {
     return this.state.trains.reduce((sum, train) => sum + train.tiles.length, 0);
   }
 
-  handleRemoteAction(action) {
+  handleRemoteAction(action, senderClientId) {
     if (!this.isOnlineHost() || !action || this.state?.roundOver) {
       return;
     }
-    const playerIndex = this.state.currentPlayer;
-    if (playerIndex !== 1) {
+    const actorSeat = this.getSeatForClientId(senderClientId);
+    if (!Number.isInteger(actorSeat)) {
+      return;
+    }
+    if (actorSeat !== this.state.currentPlayer) {
       return;
     }
     if (action.type === 'play' && Number.isInteger(action.trainIndex)) {
-      this.tryHumanMove(action.trainIndex);
+      this.tryHumanMove(action.trainIndex, action.tileId);
       return;
     }
     if (action.type === 'drawOrPass') {
@@ -952,9 +1001,11 @@ export class MexicanTrainScene extends Phaser.Scene {
     this.time.delayedCall(this.difficulty.thinkMs, () => this.runBotTurn());
   }
 
-  tryHumanMove(trainIndex) {
+  tryHumanMove(trainIndex, explicitTileId = null) {
     const playerIndex = this.state.currentPlayer;
-    const tile = this.getSelectedTile();
+    const tile = explicitTileId
+      ? this.currentPlayer.hand.find((candidate) => candidate.id === explicitTileId)
+      : this.getSelectedTile();
     if (!tile || !this.canPlayOnTrain(playerIndex, trainIndex, tile)) {
       this.state.turnMessage = 'That tile cannot be played on that train.';
       this.render();
@@ -986,7 +1037,7 @@ export class MexicanTrainScene extends Phaser.Scene {
       return;
     }
     if (this.isOnlineGuest()) {
-      this.onlineSession?.sendAction({ type: 'play', trainIndex });
+      this.onlineSession?.sendAction({ type: 'play', trainIndex, tileId: this.selectedTileId });
       return;
     }
     this.tryHumanMove(trainIndex);

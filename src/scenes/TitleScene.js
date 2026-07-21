@@ -221,12 +221,11 @@ export class TitleScene extends Phaser.Scene {
     if (this.settings.gameMode === 'local') {
       return;
     }
-    this.settings.totalPlayers = 2;
-    this.settings.humanPlayers = 2;
+    this.settings.totalPlayers = clamp(this.settings.totalPlayers, MIN_PLAYERS, MAX_PLAYERS);
+    this.settings.humanPlayers = this.settings.totalPlayers;
+    this.settings.humanPlayerNames = normalizeSettings(this.settings).humanPlayerNames;
     if (this.settings.gameMode === 'onlineHost') {
-      this.settings.humanPlayerNames = [this.settings.onlinePlayerName || 'Host', 'Guest'];
-    } else {
-      this.settings.humanPlayerNames = ['Host', this.settings.onlinePlayerName || 'Guest'];
+      this.settings.humanPlayerNames[0] = this.settings.onlinePlayerName || 'Host';
     }
   }
 

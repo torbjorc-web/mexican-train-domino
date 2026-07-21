@@ -38,12 +38,10 @@ export function normalizeSettings(settings) {
   next.onlinePartyKitHost = `${next.onlinePartyKitHost || ''}`.trim();
   next.onlinePlayerName = `${next.onlinePlayerName || ''}`.trim() || 'Player 1';
 
-  if (next.gameMode !== 'local') {
-    next.totalPlayers = 2;
-    next.humanPlayers = 2;
-  }
-
   next.totalPlayers = clamp(next.totalPlayers, MIN_PLAYERS, MAX_PLAYERS);
+  if (next.gameMode !== 'local') {
+    next.humanPlayers = next.totalPlayers;
+  }
   next.humanPlayers = clamp(next.humanPlayers, 1, next.totalPlayers);
   next.humanPlayerNames = normalizeHumanPlayerNamesFromColors(next.humanPlayerNames, next.humanPlayers);
   next.humanTrainColors = normalizeHumanTrainColors(next.humanTrainColors, next.humanPlayers);
