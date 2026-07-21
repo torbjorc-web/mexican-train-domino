@@ -31,6 +31,18 @@ export function normalizeSettings(settings) {
     ...DEFAULT_SETTINGS,
     ...(settings || {}),
   };
+  if (!['local', 'onlineHost', 'onlineJoin'].includes(next.gameMode)) {
+    next.gameMode = 'local';
+  }
+  next.onlineRoomCode = `${next.onlineRoomCode || ''}`.trim();
+  next.onlinePartyKitHost = `${next.onlinePartyKitHost || ''}`.trim();
+  next.onlinePlayerName = `${next.onlinePlayerName || ''}`.trim() || 'Player 1';
+
+  if (next.gameMode !== 'local') {
+    next.totalPlayers = 2;
+    next.humanPlayers = 2;
+  }
+
   next.totalPlayers = clamp(next.totalPlayers, MIN_PLAYERS, MAX_PLAYERS);
   next.humanPlayers = clamp(next.humanPlayers, 1, next.totalPlayers);
   next.humanPlayerNames = normalizeHumanPlayerNamesFromColors(next.humanPlayerNames, next.humanPlayers);

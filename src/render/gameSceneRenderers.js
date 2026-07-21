@@ -116,6 +116,11 @@ export function renderHand(scene) {
     scene.ui.handHint.setText(`${scene.currentPlayer.name} is evaluating moves at ${DIFFICULTY_SETTINGS[scene.settings.difficulty].label.toLowerCase()} difficulty.`);
     return;
   }
+  if (scene.isOnlineMode && scene.isOnlineMode() && scene.state.currentPlayer !== scene.getLocalPlayerIndex()) {
+    scene.ui.handTitle.setText('Remote turn');
+    scene.ui.handHint.setText('Waiting for the other player to make a move...');
+    return;
+  }
   if (scene.state.humanRevealPending) {
     scene.ui.handTitle.setText('Hand hidden');
     scene.ui.handHint.setText('Reveal the hand when the next player is ready.');

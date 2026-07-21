@@ -32,6 +32,20 @@ This workspace contains a Phaser.js browser prototype of Mexican Train Dominoes.
 - Each train now has its own visible color in the station view, and human train colors must stay unique.
 - Human player names are saved for the match and shown in the score and train summaries.
 - Completed match results are stored as local high scores in the browser.
+- Optional online multiplayer mode is available via PartyKit room sync (host + guest).
+- The Phaser canvas now uses responsive FIT scaling for phone and tablet screens.
+- Short placement sound effects play whenever a domino is placed.
+- A dedicated heavier placement clip is used for doubles.
+- Online mode includes a reconnect button in the status banner for manual reconnect.
+
+## Tiles
+
+- The prototype uses a standard double-12 domino set.
+- Total tile count is 91 unique tiles.
+- Tile notation is `a|b` (for example `12|12`, `12|7`, `0|0`).
+- The engine for each round is removed from the draw pile and placed at the center.
+- Hand size in this prototype is 15 tiles per player for 2 to 4 players.
+- Hand size in this prototype is 12 tiles per player for 5 to 6 players.
 
 ## Bot behavior
 
@@ -51,6 +65,23 @@ python -m http.server 8000
 ```
 
 Then open `http://localhost:8000` in a browser.
+
+## Online multiplayer with PartyKit
+
+1. Create and deploy a PartyKit project (or use an existing one).
+2. Use the relay implementation in `partykit/server.js` as your PartyKit server.
+3. Start this game locally as usual.
+4. In the title screen, set `Game Mode` to `Online Host (PartyKit)` on one device and `Online Join (PartyKit)` on the other.
+5. Click `Online Setup` and enter:
+   - PartyKit host (example: `your-project.your-account.partykit.dev`)
+   - shared room code
+   - your player name
+6. Start the match on host, then join from the second device using the same room code.
+
+Notes:
+
+- Current online mode is authoritative-host and trust-based (the full state is synced).
+- Online mode is currently fixed to 2 human players.
 
 ## Browser tests
 

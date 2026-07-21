@@ -56,6 +56,10 @@ export const DEFAULT_SETTINGS = {
   difficulty: 'normal',
   strictOpening: true,
   doubleRule: 'cover',
+  gameMode: 'local',
+  onlineRoomCode: '',
+  onlinePartyKitHost: '',
+  onlinePlayerName: 'Player 1',
 };
 
 export const PIP_LAYOUTS = {

@@ -7,6 +7,12 @@ const config = {
   parent: 'game-root',
   width: 1280,
   height: 720,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 1280,
+    height: 720,
+  },
   backgroundColor: `#${UI_COLORS.table.toString(16).padStart(6, '0')}`,
   scene: [TitleScene, MexicanTrainScene],
 };

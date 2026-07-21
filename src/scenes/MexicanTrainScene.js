@@ -33,6 +33,7 @@ import {
   renderStatus,
 } from '../render/gameSceneRenderers.js';
 import { renderTrainStation } from '../render/trainStationRenderer.js';
+import { createOnlineSession } from '../network/onlineSession.js';
 
 export class MexicanTrainScene extends Phaser.Scene {
   constructor() {
@@ -43,16 +44,47 @@ export class MexicanTrainScene extends Phaser.Scene {
     this.selectedTileId = null;
     this.draggingTileId = null;
     this.ui = {};
+    this.onlineSession = null;
+    this.onlineConnectionState = 'offline';
+    this.onlineStateText = '';
+    this.reconnectCooldownUntilMs = 0;
+    this.reconnectCooldownMs = 1500;
+    this.lastRenderedTileCount = 0;
   }
 
   init(data) {
     this.settings = normalizeSettings({ ...DEFAULT_SETTINGS, ...(data?.settings || {}) });
   }
 
+  preload() {
+    this.load.audio('tile-place-soft', ['assets/audio/tile-place-soft.wav']);
+    this.load.audio('tile-place-hard', ['assets/audio/tile-place-hard.wav']);
+    this.load.audio('tile-place-double', ['assets/audio/tile-place-double.wav']);
+  }
+
   create() {
     this.cameras.main.setBackgroundColor(UI_COLORS.table);
     this.buildStaticUi();
+    this.events.once('shutdown', () => this.shutdown());
+
+    if (this.isOnlineMode()) {
+      this.setupOnlineSession();
+      if (this.isOnlineHost()) {
+        this.startMatch();
+      } else {
+        this.ui.boardHint.setText('Connecting to online room. Waiting for host snapshot...');
+      }
+      return;
+    }
+
     this.startMatch();
+  }
+
+  shutdown() {
+    if (this.onlineSession) {
+      this.onlineSession.destroy();
+      this.onlineSession = null;
+    }
   }
 
   buildStaticUi() {
@@ -76,6 +108,32 @@ export class MexicanTrainScene extends Phaser.Scene {
       color: UI_COLORS.ink,
       wordWrap: { width: 620 },
     });
+
+    this.ui.onlineBannerBg = this.add.rectangle(640, 18, 420, 26, 0x3f6b52, 0.95)
+      .setStrokeStyle(2, UI_COLORS.boardLine, 1)
+      .setVisible(false)
+      .setDepth(40);
+    this.ui.onlineBannerText = this.add.text(640, 18, '', {
+      fontFamily: 'Georgia',
+      fontSize: '14px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+      align: 'center',
+    }).setOrigin(0.5, 0.5).setDepth(41).setVisible(false);
+    this.ui.onlineReconnectButton = this.add.rectangle(872, 18, 108, 22, 0x295640, 0.95)
+      .setStrokeStyle(2, UI_COLORS.boardLine, 1)
+      .setDepth(42)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true });
+    this.ui.onlineReconnectLabel = this.add.text(872, 18, 'Reconnect', {
+      fontFamily: 'Georgia',
+      fontSize: '12px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+      align: 'center',
+    }).setOrigin(0.5, 0.5).setDepth(43).setVisible(false);
+    this.ui.onlineReconnectButton.on('pointerup', () => this.onReconnectButton());
+    this.ui.onlineReconnectLabel.setInteractive({ useHandCursor: true }).on('pointerup', () => this.onReconnectButton());
 
     this.ui.scoreboard = this.add.text(28, 170, '', {
       fontFamily: 'Georgia',
@@ -274,7 +332,253 @@ export class MexicanTrainScene extends Phaser.Scene {
 
     this.selectedTileId = null;
     this.draggingTileId = null;
+    this.lastRenderedTileCount = this.getTotalPlacedTileCount();
     this.beginCurrentTurn();
+  }
+
+  isOnlineMode() {
+    return this.settings.gameMode === 'onlineHost' || this.settings.gameMode === 'onlineJoin';
+  }
+
+  isOnlineHost() {
+    return this.settings.gameMode === 'onlineHost';
+  }
+
+  isOnlineGuest() {
+    return this.settings.gameMode === 'onlineJoin';
+  }
+
+  getLocalPlayerIndex() {
+    if (this.isOnlineHost()) {
+      return 0;
+    }
+    if (this.isOnlineGuest()) {
+      return 1;
+    }
+    return this.state?.currentPlayer ?? 0;
+  }
+
+  setupAudio() {
+    // Legacy hook kept for compatibility with existing call sites.
+  }
+
+  playPlaceSound(tile = null) {
+    if (!this.sound) {
+      return;
+    }
+
+    const useHeavyDouble = Boolean(tile && isDouble(tile));
+    const useHard = !useHeavyDouble && Math.random() > 0.56;
+    const key = useHeavyDouble ? 'tile-place-double' : (useHard ? 'tile-place-hard' : 'tile-place-soft');
+    if (!this.cache.audio.exists(key)) {
+      return;
+    }
+    this.sound.play(key, {
+      volume: useHeavyDouble ? 0.45 : (useHard ? 0.35 : 0.28),
+      detune: useHeavyDouble ? Phaser.Math.Between(-35, 25) : Phaser.Math.Between(-80, 80),
+      rate: useHeavyDouble ? Phaser.Math.FloatBetween(0.92, 0.98) : Phaser.Math.FloatBetween(0.97, 1.04),
+    });
+  }
+
+  detectPlacedTileFromStates(previousState, nextState) {
+    if (!previousState?.trains || !nextState?.trains) {
+      return null;
+    }
+    for (let index = 0; index < nextState.trains.length; index += 1) {
+      const previousTrain = previousState.trains[index];
+      const nextTrain = nextState.trains[index];
+      if (!previousTrain || !nextTrain) {
+        continue;
+      }
+      if (nextTrain.tiles.length > previousTrain.tiles.length) {
+        return nextTrain.tiles[nextTrain.tiles.length - 1] || null;
+      }
+    }
+    return null;
+  }
+
+  onReconnectButton() {
+    if (!this.isOnlineMode() || !this.onlineSession) {
+      return;
+    }
+
+    const nowMs = this.time?.now || 0;
+    if (nowMs < this.reconnectCooldownUntilMs) {
+      return;
+    }
+
+    this.reconnectCooldownUntilMs = nowMs + this.reconnectCooldownMs;
+    this.updateReconnectButtonState();
+    this.setOnlineBanner('Online: manual reconnect...', 'reconnecting');
+    this.onlineSession.forceReconnect();
+
+    this.time.delayedCall(this.reconnectCooldownMs, () => {
+      this.updateReconnectButtonState();
+      this.setOnlineBanner(this.onlineStateText, this.onlineConnectionState);
+    });
+  }
+
+  updateReconnectButtonState() {
+    if (!this.ui.onlineReconnectButton || !this.ui.onlineReconnectLabel) {
+      return;
+    }
+    const nowMs = this.time?.now || 0;
+    const onCooldown = nowMs < this.reconnectCooldownUntilMs;
+    this.ui.onlineReconnectButton.setFillStyle(onCooldown ? 0x6f675d : 0x295640, 0.95);
+    this.ui.onlineReconnectButton.setAlpha(onCooldown ? 0.75 : 1);
+    this.ui.onlineReconnectLabel.setText(onCooldown ? 'Wait...' : 'Reconnect');
+    this.ui.onlineReconnectLabel.setAlpha(onCooldown ? 0.8 : 1);
+  }
+
+  setOnlineBanner(message, state = this.onlineConnectionState) {
+    if (!this.ui.onlineBannerBg || !this.ui.onlineBannerText) {
+      return;
+    }
+    if (!this.isOnlineMode()) {
+      this.ui.onlineBannerBg.setVisible(false);
+      this.ui.onlineBannerText.setVisible(false);
+      if (this.ui.onlineReconnectButton) {
+        this.ui.onlineReconnectButton.setVisible(false);
+      }
+      if (this.ui.onlineReconnectLabel) {
+        this.ui.onlineReconnectLabel.setVisible(false);
+      }
+      return;
+    }
+
+    const palette = {
+      ready: 0x2d7a46,
+      connected: 0x3f6b52,
+      connecting: 0x9a6a1b,
+      reconnecting: 0xaa4d28,
+      disconnected: 0xa6362a,
+      offline: 0x6f675d,
+    };
+
+    this.onlineConnectionState = state;
+    this.onlineStateText = message || this.onlineStateText;
+    this.ui.onlineBannerBg.setFillStyle(palette[state] || palette.offline, 0.95);
+    this.ui.onlineBannerText.setText(this.onlineStateText || 'Online mode');
+    this.ui.onlineBannerBg.setVisible(true);
+    this.ui.onlineBannerText.setVisible(true);
+    if (this.ui.onlineReconnectButton) {
+      this.ui.onlineReconnectButton.setVisible(true);
+    }
+    if (this.ui.onlineReconnectLabel) {
+      this.ui.onlineReconnectLabel.setVisible(true);
+    }
+    this.updateReconnectButtonState();
+  }
+
+  setupOnlineSession() {
+    this.onlineSession = createOnlineSession({
+      host: this.settings.onlinePartyKitHost,
+      room: this.settings.onlineRoomCode,
+      playerName: this.settings.onlinePlayerName,
+      isHost: this.isOnlineHost(),
+      onStatus: (message) => {
+        if (this.state) {
+          this.addLog(message);
+          this.setOnlineBanner(message);
+          this.render();
+        } else {
+          this.setOnlineBanner(message);
+          this.ui.boardHint.setText(message);
+        }
+      },
+      onSnapshot: (snapshot) => this.applySnapshot(snapshot),
+      onRemoteAction: (action) => this.handleRemoteAction(action),
+      onConnectionState: ({ state, attempt, delayMs }) => {
+        if (state === 'ready') {
+          this.setOnlineBanner('Online: both players connected', 'ready');
+          return;
+        }
+        if (state === 'connected') {
+          this.setOnlineBanner('Online: connected, waiting for peer...', 'connected');
+          return;
+        }
+        if (state === 'connecting') {
+          this.setOnlineBanner('Online: connecting...', 'connecting');
+          return;
+        }
+        if (state === 'reconnecting') {
+          if ((delayMs || 0) <= 0) {
+            this.setOnlineBanner(`Online: reconnecting (attempt ${attempt || 1})...`, 'reconnecting');
+            return;
+          }
+          const seconds = Math.max(1, Math.ceil(delayMs / 1000));
+          this.setOnlineBanner(`Online: reconnecting (attempt ${attempt || 1}) in ${seconds}s`, 'reconnecting');
+          return;
+        }
+        if (state === 'disconnected') {
+          this.setOnlineBanner('Online: disconnected', 'disconnected');
+        }
+      },
+    });
+    this.onlineSession.connect();
+  }
+
+  buildSnapshot() {
+    const stateCopy = JSON.parse(JSON.stringify(this.state));
+
+    // Do not send the host's hand to the guest client.
+    if (Array.isArray(stateCopy?.players) && stateCopy.players[0]) {
+      stateCopy.players[0].hand = Array.from({ length: stateCopy.players[0].hand.length }, (_, index) => ({
+        id: `hidden-host-${index}`,
+        a: 0,
+        b: 0,
+      }));
+    }
+
+    return {
+      settings: JSON.parse(JSON.stringify(this.settings)),
+      match: JSON.parse(JSON.stringify(this.match)),
+      state: stateCopy,
+    };
+  }
+
+  applySnapshot(snapshot) {
+    if (!snapshot || !snapshot.state || !snapshot.match) {
+      return;
+    }
+    const previousState = this.state;
+    const previousTileCount = this.getTotalPlacedTileCount();
+    this.match = snapshot.match;
+    this.state = snapshot.state;
+    this.settings = normalizeSettings({ ...this.settings, ...(snapshot.settings || {}) });
+    this.selectedTileId = null;
+    this.draggingTileId = null;
+    this.render();
+    const nextTileCount = this.getTotalPlacedTileCount();
+    if (nextTileCount > previousTileCount) {
+      const placedTile = this.detectPlacedTileFromStates(previousState, this.state);
+      this.playPlaceSound(placedTile);
+    }
+    this.lastRenderedTileCount = nextTileCount;
+  }
+
+  getTotalPlacedTileCount() {
+    if (!this.state || !this.state.trains) {
+      return 0;
+    }
+    return this.state.trains.reduce((sum, train) => sum + train.tiles.length, 0);
+  }
+
+  handleRemoteAction(action) {
+    if (!this.isOnlineHost() || !action || this.state?.roundOver) {
+      return;
+    }
+    const playerIndex = this.state.currentPlayer;
+    if (playerIndex !== 1) {
+      return;
+    }
+    if (action.type === 'play' && Number.isInteger(action.trainIndex)) {
+      this.tryHumanMove(action.trainIndex);
+      return;
+    }
+    if (action.type === 'drawOrPass') {
+      this.onDrawOrPass();
+    }
   }
 
   get difficulty() {
@@ -286,9 +590,12 @@ export class MexicanTrainScene extends Phaser.Scene {
   }
 
   canHumanAct() {
+    const onlineReady = !this.isOnlineMode() || this.onlineSession?.isReady();
     return Boolean(this.state)
       && !this.state.roundOver
       && this.currentPlayer.isHuman
+      && onlineReady
+      && (!this.isOnlineMode() || this.state.currentPlayer === this.getLocalPlayerIndex())
       && !this.state.humanRevealPending;
   }
 
@@ -482,7 +789,7 @@ export class MexicanTrainScene extends Phaser.Scene {
     }
     const player = this.currentPlayer;
     if (player.isHuman) {
-      this.state.humanRevealPending = this.settings.humanPlayers > 1;
+      this.state.humanRevealPending = !this.isOnlineMode() && this.settings.humanPlayers > 1;
       this.state.turnMessage = this.state.humanRevealPending ? `${player.name}'s turn. Reveal the hand when ready.` : `${player.name}'s turn.`;
       this.render();
       return;
@@ -571,6 +878,9 @@ export class MexicanTrainScene extends Phaser.Scene {
   }
 
   runBotTurn() {
+    if (this.isOnlineMode()) {
+      return;
+    }
     if (this.state.roundOver || this.currentPlayer.isHuman) {
       return;
     }
@@ -579,6 +889,9 @@ export class MexicanTrainScene extends Phaser.Scene {
     const move = chooseBotMove(this.state, this.settings, playerIndex);
     if (move) {
       const result = playTile(this.state, this.settings, playerIndex, move.trainIndex, move.tileId);
+      if (result?.ok) {
+        this.playPlaceSound(result.tile);
+      }
       this.render();
       if (this.state.roundOver) {
         return;
@@ -601,7 +914,10 @@ export class MexicanTrainScene extends Phaser.Scene {
     const drawnTile = this.drawForCurrentPlayer();
     const drawnMove = drawnTile ? chooseBotMove(this.state, this.settings, playerIndex) : null;
     if (drawnMove) {
-      playTile(this.state, this.settings, playerIndex, drawnMove.trainIndex, drawnMove.tileId);
+      const result = playTile(this.state, this.settings, playerIndex, drawnMove.trainIndex, drawnMove.tileId);
+      if (result?.ok) {
+        this.playPlaceSound(result.tile);
+      }
       this.render();
       if (this.state.roundOver) {
         return;
@@ -630,6 +946,9 @@ export class MexicanTrainScene extends Phaser.Scene {
   }
 
   scheduleBots() {
+    if (this.isOnlineMode()) {
+      return;
+    }
     this.time.delayedCall(this.difficulty.thinkMs, () => this.runBotTurn());
   }
 
@@ -642,7 +961,10 @@ export class MexicanTrainScene extends Phaser.Scene {
       return;
     }
 
-    playTile(this.state, this.settings, playerIndex, trainIndex, tile.id);
+    const result = playTile(this.state, this.settings, playerIndex, trainIndex, tile.id);
+    if (result?.ok) {
+      this.playPlaceSound(result.tile);
+    }
     this.selectedTileId = null;
     this.render();
     if (this.state.players[playerIndex].hand.length === 0) {
@@ -663,11 +985,19 @@ export class MexicanTrainScene extends Phaser.Scene {
     if (!this.canHumanAct()) {
       return;
     }
+    if (this.isOnlineGuest()) {
+      this.onlineSession?.sendAction({ type: 'play', trainIndex });
+      return;
+    }
     this.tryHumanMove(trainIndex);
   }
 
   onDrawOrPass() {
     if (!this.canHumanAct()) {
+      return;
+    }
+    if (this.isOnlineGuest()) {
+      this.onlineSession?.sendAction({ type: 'drawOrPass' });
       return;
     }
 
@@ -751,5 +1081,9 @@ export class MexicanTrainScene extends Phaser.Scene {
     this.renderBoard();
     this.renderTrainStation();
     this.renderHand();
+
+    if (this.isOnlineHost() && this.onlineSession) {
+      this.onlineSession.queueSnapshot(this.buildSnapshot());
+    }
   }
 }

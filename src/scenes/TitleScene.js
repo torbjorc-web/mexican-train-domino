@@ -12,6 +12,13 @@ import { clamp } from '../utils/dominoes.js';
 import { createTrainColorSelector, refreshTrainColorSelectors } from './titleTrainColorControls.js?v=2';
 import { createPlayerNameSelector, refreshPlayerNameSelectors } from './titlePlayerNameControls.js?v=2';
 
+const GAME_MODES = ['local', 'onlineHost', 'onlineJoin'];
+const GAME_MODE_LABELS = {
+  local: 'Local Pass-and-Play',
+  onlineHost: 'Online Host (PartyKit)',
+  onlineJoin: 'Online Join (PartyKit)',
+};
+
 export class TitleScene extends Phaser.Scene {
   constructor() {
     super('title-screen');
@@ -32,13 +39,23 @@ export class TitleScene extends Phaser.Scene {
       color: UI_COLORS.ink,
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5);
-    this.add.text(640, 145, 'Pass-and-play setup with configurable human players, rules, and bot difficulty.', {
+    this.add.text(640, 145, 'Local or PartyKit online setup with configurable rules, players, and bot difficulty.', {
       fontFamily: 'Georgia',
       fontSize: '16px',
       color: UI_COLORS.ink,
     }).setOrigin(0.5, 0.5);
 
-    this.ui.totalPlayers = this.createSelector(250, 'Total Players', () => `${this.settings.totalPlayers}`, () => {
+    this.ui.gameMode = this.createSelector(250, 'Game Mode', () => GAME_MODE_LABELS[this.settings.gameMode], () => {
+      this.settings.gameMode = this.getAdjacentGameMode(-1);
+      this.applyModeConstraints();
+      this.refreshSelectors();
+    }, () => {
+      this.settings.gameMode = this.getAdjacentGameMode(1);
+      this.applyModeConstraints();
+      this.refreshSelectors();
+    });
+
+    this.ui.totalPlayers = this.createSelector(322, 'Total Players', () => `${this.settings.totalPlayers}`, () => {
       this.settings.totalPlayers = this.settings.totalPlayers === MIN_PLAYERS ? MAX_PLAYERS : this.settings.totalPlayers - 1;
       this.settings.humanPlayers = clamp(this.settings.humanPlayers, 1, this.settings.totalPlayers);
       this.refreshSelectors();
@@ -48,7 +65,7 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.humanPlayers = this.createSelector(338, 'Human Players', () => `${this.settings.humanPlayers}`, () => {
+    this.ui.humanPlayers = this.createSelector(394, 'Human Players', () => `${this.settings.humanPlayers}`, () => {
       this.settings.humanPlayers = this.settings.humanPlayers === 1 ? this.settings.totalPlayers : this.settings.humanPlayers - 1;
       this.refreshSelectors();
     }, () => {
@@ -56,7 +73,7 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.difficulty = this.createSelector(426, 'Bot Difficulty', () => DIFFICULTY_SETTINGS[this.settings.difficulty].label, () => {
+    this.ui.difficulty = this.createSelector(466, 'Bot Difficulty', () => DIFFICULTY_SETTINGS[this.settings.difficulty].label, () => {
       this.settings.difficulty = this.getAdjacentDifficulty(-1);
       this.refreshSelectors();
     }, () => {
@@ -64,7 +81,7 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.strictOpening = this.createSelector(514, 'Opening Rule', () => (this.settings.strictOpening ? 'Strict Start' : 'Free Start'), () => {
+    this.ui.strictOpening = this.createSelector(538, 'Opening Rule', () => (this.settings.strictOpening ? 'Strict Start' : 'Free Start'), () => {
       this.settings.strictOpening = !this.settings.strictOpening;
       this.refreshSelectors();
     }, () => {
@@ -72,13 +89,25 @@ export class TitleScene extends Phaser.Scene {
       this.refreshSelectors();
     });
 
-    this.ui.doubleRule = this.createSelector(602, 'Double Rule', () => DOUBLE_RULE_SETTINGS[this.settings.doubleRule].label, () => {
+    this.ui.doubleRule = this.createSelector(610, 'Double Rule', () => DOUBLE_RULE_SETTINGS[this.settings.doubleRule].label, () => {
       this.settings.doubleRule = this.settings.doubleRule === 'cover' ? 'extraTurn' : 'cover';
       this.refreshSelectors();
     }, () => {
       this.settings.doubleRule = this.settings.doubleRule === 'cover' ? 'extraTurn' : 'cover';
       this.refreshSelectors();
     });
+
+    this.ui.onlineSetupButton = this.add.rectangle(640, 636, 220, 46, UI_COLORS.panelDark)
+      .setStrokeStyle(2, UI_COLORS.accent, 1)
+      .setInteractive({ useHandCursor: true });
+    this.ui.onlineSetupLabel = this.add.text(640, 636, 'Online Setup', {
+      fontFamily: 'Georgia',
+      fontSize: '20px',
+      color: UI_COLORS.ink,
+      fontStyle: 'bold',
+    }).setOrigin(0.5, 0.5);
+    this.ui.onlineSetupButton.on('pointerup', () => this.configureOnlineSettings());
+    this.ui.onlineSetupLabel.setInteractive({ useHandCursor: true }).on('pointerup', () => this.configureOnlineSettings());
 
     this.ui.trainColorHeader = this.add.text(1095, 190, 'Train Colors', {
       fontFamily: 'Georgia',
@@ -115,22 +144,29 @@ export class TitleScene extends Phaser.Scene {
       lineSpacing: 2,
     }).setOrigin(0.5, 0);
 
-    const startButton = this.add.rectangle(640, 668, 280, 64, UI_COLORS.accent)
+    const startButton = this.add.rectangle(640, 682, 280, 64, UI_COLORS.accent)
       .setStrokeStyle(2, 0x7c2914, 1)
       .setInteractive({ useHandCursor: true });
-    const startLabel = this.add.text(640, 668, 'Start Match', {
+    const startLabel = this.add.text(640, 682, 'Start Match', {
       fontFamily: 'Georgia',
       fontSize: '28px',
       color: '#ffffff',
       fontStyle: 'bold',
     }).setOrigin(0.5, 0.5);
     startButton.on('pointerup', () => {
+      if (!this.prepareSettingsForStart()) {
+        return;
+      }
       this.scene.start('mexican-train', { settings: { ...this.settings } });
     });
     startLabel.setInteractive({ useHandCursor: true }).on('pointerup', () => {
+      if (!this.prepareSettingsForStart()) {
+        return;
+      }
       this.scene.start('mexican-train', { settings: { ...this.settings } });
     });
 
+    this.applyModeConstraints();
     this.refreshSelectors();
   }
 
@@ -176,12 +212,77 @@ export class TitleScene extends Phaser.Scene {
     return keys[(currentIndex + direction + keys.length) % keys.length];
   }
 
+  getAdjacentGameMode(direction) {
+    const currentIndex = GAME_MODES.indexOf(this.settings.gameMode);
+    return GAME_MODES[(currentIndex + direction + GAME_MODES.length) % GAME_MODES.length];
+  }
+
+  applyModeConstraints() {
+    if (this.settings.gameMode === 'local') {
+      return;
+    }
+    this.settings.totalPlayers = 2;
+    this.settings.humanPlayers = 2;
+    if (this.settings.gameMode === 'onlineHost') {
+      this.settings.humanPlayerNames = [this.settings.onlinePlayerName || 'Host', 'Guest'];
+    } else {
+      this.settings.humanPlayerNames = ['Host', this.settings.onlinePlayerName || 'Guest'];
+    }
+  }
+
+  configureOnlineSettings() {
+    if (this.settings.gameMode === 'local') {
+      return;
+    }
+
+    const currentHost = this.settings.onlinePartyKitHost || 'your-project.your-account.partykit.dev';
+    const host = window.prompt('PartyKit host (without https://)', currentHost);
+    if (host === null) {
+      return;
+    }
+
+    const currentRoom = this.settings.onlineRoomCode || 'hyttedomino';
+    const room = window.prompt('Room code', currentRoom);
+    if (room === null) {
+      return;
+    }
+
+    const defaultName = this.settings.gameMode === 'onlineHost' ? 'Host' : 'Guest';
+    const currentName = this.settings.onlinePlayerName || defaultName;
+    const playerName = window.prompt('Your player name', currentName);
+    if (playerName === null) {
+      return;
+    }
+
+    this.settings.onlinePartyKitHost = host.trim();
+    this.settings.onlineRoomCode = room.trim();
+    this.settings.onlinePlayerName = playerName.trim() || defaultName;
+    this.applyModeConstraints();
+    this.refreshSelectors();
+  }
+
+  prepareSettingsForStart() {
+    this.applyModeConstraints();
+    if (this.settings.gameMode === 'local') {
+      return true;
+    }
+
+    if (!this.settings.onlinePartyKitHost || !this.settings.onlineRoomCode) {
+      this.configureOnlineSettings();
+    }
+    return Boolean(this.settings.onlinePartyKitHost && this.settings.onlineRoomCode);
+  }
+
   refreshSelectors() {
+    this.applyModeConstraints();
+    this.ui.gameMode.valueText.setText(this.ui.gameMode.getValue());
     this.ui.totalPlayers.valueText.setText(this.ui.totalPlayers.getValue());
     this.ui.humanPlayers.valueText.setText(this.ui.humanPlayers.getValue());
     this.ui.difficulty.valueText.setText(this.ui.difficulty.getValue());
     this.ui.strictOpening.valueText.setText(this.ui.strictOpening.getValue());
     this.ui.doubleRule.valueText.setText(this.ui.doubleRule.getValue());
+    this.ui.onlineSetupButton.setVisible(this.settings.gameMode !== 'local');
+    this.ui.onlineSetupLabel.setVisible(this.settings.gameMode !== 'local');
     refreshTrainColorSelectors(this);
     refreshPlayerNameSelectors(this);
 
